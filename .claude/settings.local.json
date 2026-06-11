@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.anthropic.com)",
+      "Read(//c/Users/ethan/.claude/projects/C--Users-ethan-Personal-Coding-Projects-Intent/b5550ce5-5143-44b2-9bd5-f90e9cc4a710/tool-results/**)",
+      "Bash(file extracted/*)"
+    ]
+  }
+}
