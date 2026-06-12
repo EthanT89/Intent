@@ -89,6 +89,12 @@ export function CoffeeSection({ onBack }) {
         }}>+ New</button>
       </div>
 
+      {recipes.length === 0 && (
+        <div style={{
+          fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+          padding: '14px 0', textAlign: 'center',
+        }}>No recipes yet — tap "+ New" to dial in your first one.</div>
+      )}
       {recipes.map((r, i) => (
         <button key={r.id} onClick={() => viewRecipe(r)} style={{
           display: 'flex', width: '100%', alignItems: 'center',
@@ -120,6 +126,12 @@ export function CoffeeSection({ onBack }) {
         marginBottom: 10, marginTop: 28,
       }}>Recent pulls</div>
 
+      {visiblePulls.length === 0 && (
+        <div style={{
+          fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+          padding: '14px 0', textAlign: 'center',
+        }}>Nothing logged yet.</div>
+      )}
       {visiblePulls.map((p, i) => (
         <div key={p.id} style={{
           display: 'flex', alignItems: 'center',

@@ -1,40 +1,31 @@
 import React from 'react';
 import { PILLAR_COLORS, T } from '../../theme/tokens.js';
 import {
-  PillarPill, CategoryLabel, Glyph, DayPills, DarkButton, StubPage,
+  PillarPill, CategoryLabel, Glyph, DayPills, StubPage,
 } from '../../components/primitives.jsx';
 import { useUI } from '../../store/uiContext.js';
 
-// Movement pillar — pill is sample content for now, section is a stub.
+// Movement pillar — tracking isn't built yet; pill shows an honest empty state.
 
 function MovementPill() {
   const { navigateToPillar } = useUI();
-  const weekDays = [
-    { label: 'M', done: true },
-    { label: 'T', done: true },
-    { label: 'W', done: true },
-    { label: 'T', done: false },
-    { label: 'F', done: false },
-    { label: 'S', done: false },
-    { label: 'S', done: false },
-  ];
+  const weekDays = ['M','T','W','T','F','S','S'].map(label => ({ label, done: false }));
   // Highlight the actual current weekday (Monday-first row)
   const todayIndex = (new Date().getDay() + 6) % 7;
   return (
     <PillarPill onNavigate={() => navigateToPillar('movement')}>
-      <CategoryLabel>today's lift</CategoryLabel>
+      <CategoryLabel>movement</CategoryLabel>
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         <Glyph color={T.pillars.movement} />
         <div style={{ flex: 1, paddingRight: 16 }}>
           <div style={{
             fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600,
             color: T.ink, marginBottom: 3,
-          }}>Push day A</div>
+          }}>No workout logged.</div>
           <div style={{
             fontFamily: T.fontSans, fontSize: 13, color: T.muted, marginBottom: 10,
-          }}>5 lifts · 45 min</div>
+          }}>Workout tracking coming soon.</div>
           <DayPills days={weekDays} todayIndex={todayIndex} />
-          <DarkButton onClick={() => navigateToPillar('movement')}>Start workout</DarkButton>
         </div>
       </div>
     </PillarPill>
@@ -54,9 +45,8 @@ export default {
   StatsScreen: null,
   getStats() {
     return [
-      { number: '11', label: 'workouts this month' },
-      { number: '3 / 4', label: 'this week' },
-      { number: '42k', label: 'lbs volume' },
+      { number: '0', label: 'workouts this month' },
+      { number: '0 / 0', label: 'this week' },
     ];
   },
 };

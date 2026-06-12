@@ -16,7 +16,24 @@ export function RoutinePill() {
   const tKey = todayKey();
 
   const routine = routines.list.find(r => isActiveDay(r, today)) || routines.list[0];
-  if (!routine) return null;
+
+  // Empty state — no routines yet
+  if (!routine) {
+    return (
+      <PillarPill onNavigate={() => navigateToPillar('routine')}>
+        <CategoryLabel>routine</CategoryLabel>
+        <div style={{ paddingRight: 16 }}>
+          <div style={{
+            fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600,
+            color: T.ink, lineHeight: 1.3, marginBottom: 4,
+          }}>No routines yet.</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>
+            Tap to build your first one.
+          </div>
+        </div>
+      </PillarPill>
+    );
+  }
 
   const history = routines.history[routine.id] || {};
   const todayMap = history[tKey] || {};
@@ -195,6 +212,61 @@ export function RoutineSection({ onBack }) {
     if (!routine && list.length > 0) setActiveId(list[0].id);
   }, [routine, list]);
 
+  const createRoutine = () => {
+    const newId = `routine-${Date.now()}`;
+    setRoutineList(prev => [...prev, {
+      id: newId, name: 'New routine', description: '',
+      daysOn: [0,1,2,3,4,5,6], items: [],
+    }]);
+    setRoutineHistory(prev => ({ ...prev, [newId]: {} }));
+    setActiveId(newId);
+    setEditing(true);
+  };
+
+  // Empty state — no routines yet
+  if (!routine && !editing) {
+    return (
+      <div style={{ padding: '10px 16px 120px' }}>
+        <div style={{ paddingTop: 8, marginBottom: 16 }}>
+          <button onClick={onBack} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 5,
+            fontFamily: T.fontSans, fontSize: 13, color: T.pillars.routine, padding: 0,
+          }}>
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
+              <path d="M7 1L1 7l6 6" stroke={T.pillars.routine} strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Today
+          </button>
+        </div>
+        <div style={{
+          fontFamily: T.fontSerif, fontSize: 30, fontWeight: 600, color: T.ink,
+          lineHeight: 1.1, marginBottom: 24,
+        }}>Routines</div>
+        <div style={{
+          background: T.card, border: `0.5px solid ${T.border}`,
+          borderRadius: 16, padding: '36px 24px', textAlign: 'center',
+        }}>
+          <div style={{
+            fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600,
+            color: T.ink, marginBottom: 8,
+          }}>Nothing here yet.</div>
+          <div style={{
+            fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+            lineHeight: 1.6, marginBottom: 20,
+          }}>A routine is a named checklist with its own schedule, streak, and history.</div>
+          <button onClick={createRoutine} style={{
+            background: T.ink, color: '#FAF7F2',
+            border: 'none', borderRadius: 12,
+            padding: '12px 24px', cursor: 'pointer',
+            fontFamily: T.fontSans, fontSize: 14, fontWeight: 600,
+          }}>Create your first routine</button>
+        </div>
+      </div>
+    );
+  }
+
   if (!routine) return null;
 
   const accent = T.pillars.routine;
@@ -222,7 +294,7 @@ export function RoutineSection({ onBack }) {
         });
         setEditing(false);
       }}
-      canDelete={list.length > 1}
+      canDelete={true} // empty state handles zero routines, so the last one is deletable too
     />;
   }
 
@@ -265,16 +337,7 @@ export function RoutineSection({ onBack }) {
             cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
           }}>{r.name}</button>
         ))}
-        <button onClick={() => {
-          const newId = `routine-${Date.now()}`;
-          setRoutineList(prev => [...prev, {
-            id: newId, name: 'New routine', description: '',
-            daysOn: [0,1,2,3,4,5,6], items: [],
-          }]);
-          setRoutineHistory(prev => ({ ...prev, [newId]: {} }));
-          setActiveId(newId);
-          setEditing(true);
-        }} style={{
+        <button onClick={createRoutine} style={{
           padding: '8px 12px', borderRadius: 999, border: `1px dashed ${T.border}`,
           background: 'transparent', color: T.muted,
           fontFamily: T.fontSans, fontSize: 13, fontWeight: 500,

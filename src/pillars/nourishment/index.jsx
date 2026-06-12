@@ -13,7 +13,7 @@ function NourishmentPill() {
   const { navigateToPillar } = useUI();
   const [proteinModal, setProteinModal] = React.useState(false);
   const [weightModal, setWeightModal] = React.useState(false);
-  const proteinPct = Math.round(86 / 140 * 100);
+  const proteinPct = 0; // nothing logged yet — persistence comes with the pillar build-out
   return (
     <PillarPill onNavigate={() => navigateToPillar('nourishment')}>
       <CategoryLabel>nourishment</CategoryLabel>
@@ -27,7 +27,7 @@ function NourishmentPill() {
           <span style={{
             fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink,
             flex: 1, textAlign: 'center',
-          }}>86 / 140 g</span>
+          }}>0 / 140 g</span>
           <button onClick={e => { e.stopPropagation(); setProteinModal(true); }} style={{
             width: 28, height: 28, borderRadius: '50%',
             background: T.border, border: 'none', cursor: 'pointer',
@@ -44,7 +44,7 @@ function NourishmentPill() {
           <span style={{
             fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink,
             flex: 1, textAlign: 'center',
-          }}>172 lb</span>
+          }}>— lb</span>
           <button onClick={e => { e.stopPropagation(); setWeightModal(true); }} style={{
             width: 28, height: 28, borderRadius: '50%',
             background: T.border, border: 'none', cursor: 'pointer',
@@ -136,16 +136,7 @@ function WeightModal({ open, onClose }) {
 // ─── Section page ────────────────────────────────────────────────────────────
 function NourishmentSection({ onBack }) {
   const accentColor = T.pillars.nourishment;
-  const weekProtein = [
-    { label: 'M', value: 122 },
-    { label: 'T', value: 98 },
-    { label: 'W', value: 140 },
-    { label: 'T', value: 115 },
-    { label: 'F', value: 132 },
-    { label: 'S', value: 87 },
-    { label: 'S', value: 86 },
-  ];
-  const weightTrend = [172.8, 172.6, 172.4, 172.8, 172.2, 172.0, 172.4, 172.2, 172.0, 171.8, 172.0, 172.0, 172.2, 172.0];
+  const weekProtein = ['M','T','W','T','F','S','S'].map(label => ({ label, value: 0 }));
 
   return (
     <div style={{ padding: '10px 16px 120px' }}>
@@ -155,8 +146,8 @@ function NourishmentSection({ onBack }) {
       <GroupLabel>Today</GroupLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
         {[
-          { label: 'protein', number: '86 / 140', sub: 'grams' },
-          { label: 'weight', number: '172', sub: 'lbs' },
+          { label: 'protein', number: '0 / 140', sub: 'grams' },
+          { label: 'weight', number: '—', sub: 'lbs' },
         ].map((m, i) => (
           <div key={i} style={{
             background: T.card, border: `0.5px solid ${T.border}`,
@@ -175,9 +166,9 @@ function NourishmentSection({ onBack }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>protein progress</div>
-          <div style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: accentColor }}>61%</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: accentColor }}>0%</div>
         </div>
-        <ProgressBar pct={61} color={accentColor} height={5} />
+        <ProgressBar pct={0} color={accentColor} height={5} />
       </div>
 
       {/* This week protein */}
@@ -196,68 +187,18 @@ function NourishmentSection({ onBack }) {
       <GroupLabel>Weight trend</GroupLabel>
       <div style={{
         background: T.card, border: `0.5px solid ${T.border}`,
-        borderRadius: 16, padding: '16px', marginBottom: 8,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 500, color: T.muted }}>
-            last 14 days
-          </div>
-          <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>
-            −0.8 lb
-          </div>
-        </div>
-        <WeightLineChart values={weightTrend} color={accentColor} />
-      </div>
+        borderRadius: 16, padding: '20px 16px', marginBottom: 8,
+        fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+        textAlign: 'center', lineHeight: 1.5,
+      }}>No weigh-ins yet.</div>
 
       {/* Recent meals */}
       <GroupLabel>Today's log</GroupLabel>
-      {[
-        { meal: 'Greek yogurt + granola', protein: 18, time: '7:30 am' },
-        { meal: 'Chicken + rice bowl', protein: 42, time: '12:15 pm' },
-        { meal: 'Protein shake', protein: 26, time: '3:00 pm' },
-      ].map((m, i) => (
-        <div key={i} style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 0',
-          borderBottom: i < 2 ? `0.5px solid ${T.border}` : 'none',
-        }}>
-          <div>
-            <div style={{ fontFamily: T.fontSans, fontSize: 14, color: T.ink, marginBottom: 2 }}>{m.meal}</div>
-            <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{m.time}</div>
-          </div>
-          <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>
-            +{m.protein}g
-          </div>
-        </div>
-      ))}
+      <div style={{
+        fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+        padding: '14px 0', textAlign: 'center',
+      }}>Nothing logged today.</div>
     </div>
-  );
-}
-
-function WeightLineChart({ values, color }) {
-  const min = Math.min(...values) - 0.5;
-  const max = Math.max(...values) + 0.5;
-  const w = 310, h = 60, pad = 4;
-  const pts = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * (w - pad * 2);
-    const y = pad + ((max - v) / (max - min)) * (h - pad * 2);
-    return `${x},${y}`;
-  });
-  return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
-      <polyline
-        points={pts.join(' ')}
-        fill="none" stroke={color} strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
-      />
-      {values.map((v, i) => {
-        const [x, y] = pts[i].split(',').map(Number);
-        return (
-          <circle key={i} cx={x} cy={y} r={i === values.length - 1 ? 4 : 2.5}
-            fill={i === values.length - 1 ? color : `${color}80`} />
-        );
-      })}
-    </svg>
   );
 }
 
@@ -270,9 +211,8 @@ export default {
   StatsScreen: null,
   getStats() {
     return [
-      { number: '127g', label: 'avg protein' },
-      { number: '172', label: 'current weight' },
-      { number: '−1.2', label: '30-day change (lb)' },
+      { number: '0g', label: 'avg protein' },
+      { number: '—', label: 'current weight' },
     ];
   },
 };

@@ -1,5 +1,6 @@
 import { PILLAR_COLORS } from '../../theme/tokens.js';
 import { DeepWorkPill, DeepWorkSection } from './components.jsx';
+import { isThisMonth } from '../../lib/dates.js';
 
 export default {
   id: 'deepwork',
@@ -8,11 +9,12 @@ export default {
   Pill: DeepWorkPill,
   Section: DeepWorkSection,
   StatsScreen: null, // stub for now
-  getStats() {
+  getStats(app) {
+    const sessions = (app.deepwork.sessions || []).filter(s => isThisMonth(s.at));
+    const hours = sessions.reduce((a, s) => a + (s.minutes || 0), 0) / 60;
     return [
-      { number: '18', label: 'sessions this month' },
-      { number: '24.6', label: 'hours this month' },
-      { number: 'P4', label: 'current phase' },
+      { number: String(sessions.length), label: 'sessions this month' },
+      { number: hours.toFixed(1), label: 'hours this month' },
     ];
   },
 };

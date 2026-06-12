@@ -6,9 +6,10 @@ import {
 } from '../../components/primitives.jsx';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { useUI } from '../../store/uiContext.js';
+import { isToday } from '../../lib/dates.js';
 
-// Sample phase content — swap for real phase tracking when the pillar grows up.
-const CURRENT_PHASE = { title: 'Phase 4 — shadow mapping', project: 'Software renderer' };
+// Phases as a concept aren't built yet, so sessions get a generic title.
+const SESSION_TITLE = 'Deep work session';
 
 function useElapsedMinutes(startedAt) {
   const calc = () => startedAt ? Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000)) : 0;
@@ -64,10 +65,10 @@ export function DeepWorkPill() {
             <div style={{
               fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600,
               color: T.ink, lineHeight: 1.3, marginBottom: 3,
-            }}>{CURRENT_PHASE.title}</div>
+            }}>{SESSION_TITLE}</div>
             <div style={{
               fontFamily: T.fontSans, fontSize: 13, color: T.muted, marginBottom: 10,
-            }}>{CURRENT_PHASE.project} · {elapsed} min in</div>
+            }}>{elapsed} min in</div>
             <ProgressBar pct={Math.min(95, (elapsed / 90) * 100)} style={{ marginBottom: 8 }} />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
@@ -100,7 +101,7 @@ export function DeepWorkPill() {
         <div style={{
           fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600,
           color: T.ink,
-        }}>{CURRENT_PHASE.title} · {minutes} min</div>
+        }}>{SESSION_TITLE} · {minutes} min</div>
         <div style={{
           width: 24, height: 24, borderRadius: '50%',
           background: `${T.pillars.deepwork}22`,
@@ -147,7 +148,7 @@ export function LogSessionModal({ open, onClose, onSave, minutes }) {
           active session
         </div>
         <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>
-          {CURRENT_PHASE.title}
+          {SESSION_TITLE}
         </div>
       </div>
       <div style={{
@@ -195,19 +196,14 @@ export function DeepWorkSection({ onBack }) {
   const accentColor = T.pillars.deepwork;
   const elapsed = useElapsedMinutes(deepwork.startedAt);
 
-  const phases = [
-    { title: 'Software renderer', concepts: 18, hours: 47.3, started: 'Apr 12', active: true },
-    { title: 'Roblox prep', concepts: 6, hours: 12.1, started: 'Mar 28', active: true },
-    { title: 'Spring quarter 2026', concepts: 12, hours: 32.8, started: 'Feb 14', active: false },
-  ];
-
-  const recentSessions = [
-    { concept: 'Phase 4 — shadow mapping', duration: '47 min', date: 'Today' },
-    { concept: 'Phase 4 — shadow mapping', duration: '62 min', date: 'Yesterday' },
-    { concept: 'Roblox prep', duration: '38 min', date: 'May 1' },
-    { concept: 'Phase 4 — shadow mapping', duration: '55 min', date: 'Apr 30' },
-    { concept: 'Roblox prep', duration: '44 min', date: 'Apr 29' },
-  ];
+  const sessionDate = (iso) => {
+    if (isToday(iso)) return 'Today';
+    const d = new Date(iso);
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    if (days <= 1) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  const recentSessions = (deepwork.sessions || []).slice(0, 8);
 
   return (
     <div style={{ padding: '10px 16px 120px' }}>
@@ -223,7 +219,7 @@ export function DeepWorkSection({ onBack }) {
             active session
           </div>
           <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, marginBottom: 2 }}>
-            {CURRENT_PHASE.title}
+            {SESSION_TITLE}
           </div>
           <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>{elapsed} min · in progress</div>
         </div>
@@ -231,58 +227,39 @@ export function DeepWorkSection({ onBack }) {
 
       {/* Phases */}
       <GroupLabel>Phases</GroupLabel>
-      {phases.map((p, i) => (
-        <div key={i} style={{
-          background: T.card, border: `0.5px solid ${T.border}`,
-          borderRadius: 16, padding: '16px', marginBottom: 8,
-          display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer',
-        }}>
-          <div style={{
-            width: 4, height: 36, borderRadius: 999,
-            background: p.active ? accentColor : T.border, flexShrink: 0,
-          }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, flex: 1, minWidth: 0 }}>
-                {p.title}
-              </div>
-              {p.active && (
-                <span style={{
-                  fontFamily: T.fontSans, fontSize: 10, fontWeight: 600,
-                  padding: '2px 7px', borderRadius: 999,
-                  background: `${accentColor}20`, color: accentColor,
-                  flexShrink: 0,
-                }}>active</span>
-              )}
-            </div>
-            <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>
-              {p.concepts} concepts · {p.hours} hrs · since {p.started}
-            </div>
-          </div>
-          <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-            <path d="M1 1l6 6-6 6" stroke={T.muted} strokeWidth="1.8"
-              strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-      ))}
+      <div style={{
+        background: T.card, border: `0.5px solid ${T.border}`,
+        borderRadius: 16, padding: '20px 16px', marginBottom: 8,
+        fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+        textAlign: 'center', lineHeight: 1.5,
+      }}>No phases yet — phases group sessions around one project or pursuit.</div>
 
       {/* Recent sessions */}
       <GroupLabel>Recent sessions</GroupLabel>
+      {recentSessions.length === 0 && (
+        <div style={{
+          fontFamily: T.fontSans, fontSize: 13, color: T.muted,
+          padding: '14px 0', textAlign: 'center',
+        }}>No sessions logged yet.</div>
+      )}
       {recentSessions.map((s, i) => (
         <div key={i} style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 0',
           borderBottom: i < recentSessions.length - 1 ? `0.5px solid ${T.border}` : 'none',
         }}>
-          <div>
-            <div style={{ fontFamily: T.fontSans, fontSize: 14, color: T.ink, marginBottom: 2 }}>
-              {s.concept}
+          <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+            <div style={{
+              fontFamily: T.fontSans, fontSize: 14, color: T.ink, marginBottom: 2,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {s.notes || SESSION_TITLE}
             </div>
-            <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{s.date}</div>
+            <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{sessionDate(s.at)}</div>
           </div>
           <div style={{
-            fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink,
-          }}>{s.duration}</div>
+            fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, flexShrink: 0,
+          }}>{s.minutes} min</div>
         </div>
       ))}
     </div>

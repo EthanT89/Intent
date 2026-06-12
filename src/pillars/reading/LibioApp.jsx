@@ -286,9 +286,10 @@ function LibioShelfPickerModal({ book, onSelect, onDismiss }) {
 }
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
-function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, userName }) {
+function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, onAddBook, userName }) {
   const currentBook = books.reading[0];
   const otherCurrent = books.reading.slice(1);
+  const hasAnyBooks = ['reading','read','wantToRead','paused'].some(s => (books[s] || []).length > 0);
   return (
     <div className="intent-scroll" style={{
       height: '100%', overflowY: 'auto', overflowX: 'hidden',
@@ -300,6 +301,30 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, u
         <p style={{ fontSize: 13, color: '#A89880', marginBottom: 4 }}>{greetingForNow()}</p>
         <h1 style={{ fontFamily: "'Lora', serif", fontSize: 28, color: '#2C2418', fontWeight: 600, lineHeight: 1.2 }}>{userName}.</h1>
       </div>
+
+      {/* Empty state — nothing on any shelf yet */}
+      {!currentBook && (
+        <div style={{
+          background: '#FFFFFF', border: '0.5px solid #EAE0D4',
+          borderRadius: 20, padding: '36px 24px', marginBottom: 16, textAlign: 'center',
+        }}>
+          <svg width="64" height="48" viewBox="0 0 64 48" fill="none" style={{ marginBottom: 16 }}>
+            <path d="M32 8 C24 8 14 10 8 14 L8 40 C14 37 24 36 32 38 C40 36 50 37 56 40 L56 14 C50 10 40 8 32 8Z" stroke="#C4956A" strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
+            <path d="M32 8 L32 38" stroke="#C4956A" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <h3 style={{ fontFamily: "'Lora', serif", fontSize: 18, fontWeight: 600, color: '#2C2418', marginBottom: 8 }}>
+            Nothing on the nightstand.
+          </h3>
+          <p style={{ fontSize: 13, color: '#A89880', lineHeight: 1.5, marginBottom: 20 }}>
+            Add your first book to start tracking.
+          </p>
+          <button onClick={onAddBook} style={{
+            padding: '12px 22px', background: '#2C2418', color: '#FAF7F2',
+            border: 'none', borderRadius: 999, fontFamily: "'DM Sans', sans-serif",
+            fontSize: 14, fontWeight: 600, cursor: 'pointer', margin: '0 auto',
+          }}>+ Add a book</button>
+        </div>
+      )}
 
       {/* Currently Reading — primary */}
       {currentBook && (
@@ -390,7 +415,8 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, u
         </div>
       </div>
 
-      {/* What's Next */}
+      {/* What's Next — only once there's something in the library */}
+      {hasAnyBooks && (
       <div style={{ background: '#FFF8F0', border: '0.5px solid #EAE0D4', borderRadius: 20, padding: 20 }}>
         <p style={{ fontSize: 11, color: '#A89880', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12, fontWeight: 500 }}>What's Next?</p>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 14 }}>
@@ -407,6 +433,7 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, u
           fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
         }}>See why</button>
       </div>
+      )}
     </div>
   );
 }
@@ -995,7 +1022,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
 
       {/* Main screens */}
       <div style={{ ...slideStyle, transform: screen === 'main' ? 'translateX(0)' : 'translateX(-100%)', opacity: screen === 'main' ? 1 : 0, pointerEvents: screen === 'main' ? 'auto' : 'none' }}>
-        {tab === 'home' && <LibioHomeScreen books={books} stats={LIBIO_STATS_DATA} onBookTap={handleBookTap} onLogSession={handleLogSession} onDiscovery={() => setScreen('discovery')} userName={settings.userName} />}
+        {tab === 'home' && <LibioHomeScreen books={books} stats={LIBIO_STATS_DATA} onBookTap={handleBookTap} onLogSession={handleLogSession} onDiscovery={() => setScreen('discovery')} onAddBook={() => setScreen('addBook')} userName={settings.userName} />}
         {tab === 'library' && <LibioLibraryScreen books={books} onBookTap={handleBookTap} onAddBook={() => setScreen('addBook')} />}
         {tab === 'stats' && <LibioStatsScreen stats={LIBIO_STATS_DATA} />}
 

@@ -19,9 +19,12 @@ export default {
   LibioLogSessionSheet,
   statsData: LIBIO_STATS_DATA,
   getStats(app) {
+    const read = app.books.read || [];
+    const pagesRead = [...read, ...(app.books.reading || []), ...(app.books.paused || [])]
+      .reduce((a, b) => a + (b.currentPage || 0), 0);
     return [
-      { number: String(LIBIO_STATS_DATA.booksThisYear), label: 'books this year' },
-      { number: LIBIO_STATS_DATA.totalPages.toLocaleString(), label: 'pages this year' },
+      { number: String(read.length), label: 'books finished' },
+      { number: pagesRead.toLocaleString(), label: 'pages read' },
       { number: String(app.books.reading.length), label: 'currently reading' },
     ];
   },

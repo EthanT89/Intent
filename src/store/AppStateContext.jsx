@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey } from '../lib/dates.js';
-import { COFFEE_RECIPES_SEED, makeCoffeePullsSeed } from '../pillars/coffee/data.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
-import { ROUTINES_SEED, buildRoutineHistory } from '../pillars/routine/model.js';
 import { PILLARS } from '../pillars/registry.js';
 
 // All app data lives here, split into independently-persisted slices.
@@ -37,22 +35,13 @@ export const DEFAULT_SETTINGS = {
   settingsPresentation: 'page',
 };
 
-function seedRoutineState() {
-  const history = {};
-  ROUTINES_SEED.forEach(r => { history[r.id] = buildRoutineHistory(r); });
-  return { list: ROUTINES_SEED, history };
-}
-
 export function AppStateProvider({ children }) {
   const [settings, setSettings] = usePersistentState('intent.settings', DEFAULT_SETTINGS);
-  const [coffee, setCoffee] = usePersistentState('intent.coffee', () => ({
-    pulls: makeCoffeePullsSeed(),
-    recipes: COFFEE_RECIPES_SEED,
-  }));
+  const [coffee, setCoffee] = usePersistentState('intent.coffee', { pulls: [], recipes: [] });
   const [books, setBooks] = usePersistentState('intent.books', LIBIO_BOOKS_SEED);
-  const [routines, setRoutines] = usePersistentState('intent.routines', seedRoutineState);
+  const [routines, setRoutines] = usePersistentState('intent.routines', { list: [], history: {} });
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
-    state: 'idle', startedAt: null, day: todayKey(), lastSession: null,
+    state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
   const [firstUse] = usePersistentState('intent.firstUse', () => new Date().toISOString());
 
@@ -81,14 +70,22 @@ export function AppStateProvider({ children }) {
       recipes: [...prev.recipes, { id: Date.now(), ...recipe }],
     }));
 
-    // Deep work — auto-reset to idle each new day ----------------------------
+    // Deep work — auto-reset to idle each new day (logged sessions persist) --
     const today = todayKey();
-    const dw = deepwork.day === today ? deepwork : { state: 'idle', startedAt: null, day: today, lastSession: null };
-    const startSession = () => setDeepwork({ state: 'active', startedAt: new Date().toISOString(), day: today, lastSession: null });
-    const endSession = ({ minutes, notes, quality }) => setDeepwork({
-      state: 'done', startedAt: null, day: today,
-      lastSession: { minutes, notes, quality, at: new Date().toISOString() },
-    });
+    const dw = deepwork.day === today
+      ? deepwork
+      : { state: 'idle', startedAt: null, day: today, lastSession: null, sessions: deepwork.sessions || [] };
+    const startSession = () => setDeepwork(prev => ({
+      ...prev, state: 'active', startedAt: new Date().toISOString(), day: today, lastSession: null,
+    }));
+    const endSession = ({ minutes, notes, quality }) => {
+      const session = { minutes, notes, quality, at: new Date().toISOString() };
+      setDeepwork(prev => ({
+        state: 'done', startedAt: null, day: today,
+        lastSession: session,
+        sessions: [session, ...(prev.sessions || [])],
+      }));
+    };
 
     // Routines ---------------------------------------------------------------
     const setRoutineList = (updater) => setRoutines(prev => ({
