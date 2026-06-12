@@ -3,3 +3,10 @@ dist/
 dev-dist/
 *.local
 .DS_Store
+
+# Capacitor native projects — generated artifacts, not source. Recreate with:
+#   npm run native:add:android   (and/or native:add:ios on a Mac)
+#   npm run native:icons
+# All native config lives in capacitor.config.ts + assets/ (both committed).
+/android/
+/ios/

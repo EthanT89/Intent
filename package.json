@@ -6,13 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "native:add:android": "cap add android",
+    "native:add:ios": "cap add ios",
+    "native:icons": "capacitor-assets generate",
+    "native:sync": "vite build && cap sync",
+    "native:android": "vite build && cap sync android && cap open android",
+    "native:ios": "vite build && cap sync ios && cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.7",
     "vite-plugin-pwa": "^0.21.1"
