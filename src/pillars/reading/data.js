@@ -1,7 +1,7 @@
 // Reading (Libio) initial state — shelves start empty.
-// LIBIO_SEARCH_RESULTS / LIBIO_DISCOVERY_DATA are the prototype's mock search
-// catalog: they aren't *your* data, they're the (for-now) stand-in for a real
-// book-search API, and the only way to add books. Swap for a real API later.
+// Book search is now powered by the live Open Library catalog (see
+// ./bookSearch.js). LIBIO_DISCOVERY_DATA below is still a small curated set of
+// "what's next" recommendations shown on the discovery screen.
 
 export const LIBIO_BOOKS_SEED = {
   reading: [],
@@ -33,11 +33,3 @@ export const LIBIO_DISCOVERY_DATA = [
     reason: 'A Stephenson classic.' },
 ];
 
-export const LIBIO_SEARCH_RESULTS = [
-  { id: 101, title: 'The Daily Stoic', author: 'Ryan Holiday', color: '#8B7355' },
-  { id: 102, title: 'Letters from a Stoic', author: 'Seneca', color: '#6B7A5A' },
-  { id: 103, title: 'How to Think Like a Roman Emperor', author: 'Donald Robertson', color: '#7A6B8B' },
-  { id: 104, title: 'A Guide to the Good Life', author: 'William B. Irvine', color: '#8B6B4A' },
-  { id: 105, title: 'The Obstacle Is the Way', author: 'Ryan Holiday', color: '#B87B5A' },
-  { id: 106, title: 'Meditations', author: 'Marcus Aurelius', color: '#8B7355' },
-];

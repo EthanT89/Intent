@@ -36,3 +36,6 @@ body {
 
 button { -webkit-tap-highlight-color: transparent; font: inherit; }
 input, textarea { font-family: 'DM Sans', system-ui, sans-serif; }
+
+@keyframes libio-spin { to { transform: rotate(360deg); } }
+.libio-spinner { animation: libio-spin 0.7s linear infinite; }

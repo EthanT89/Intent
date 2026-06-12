@@ -1,6 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { PillarPill, CategoryLabel, Glyph, ProgressBar } from '../../components/primitives.jsx';
+import { BookCover } from './BookCover.jsx';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { useUI } from '../../store/uiContext.js';
 
@@ -111,7 +112,7 @@ export function ReadingPill() {
 function ReadingBookCard({ book, onLogSession }) {
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <Glyph color={book.color || T.pillars.reading} />
+      <BookCover book={{ ...book, color: book.color || T.pillars.reading }} width={52} height={76} radius={6} />
       <div style={{ flex: 1, paddingRight: 16, minWidth: 0 }}>
         <div style={{
           fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600,

@@ -2,8 +2,10 @@ import React from 'react';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { greetingForNow } from '../../lib/dates.js';
 import {
-  LIBIO_STATS_DATA, LIBIO_DISCOVERY_DATA, LIBIO_SEARCH_RESULTS,
+  LIBIO_STATS_DATA, LIBIO_DISCOVERY_DATA,
 } from './data.js';
+import { searchBooks } from './bookSearch.js';
+import { BookCover } from './BookCover.jsx';
 
 // Full Libio app embedded as the Reading pillar — ported 1:1 from the design
 // prototype (intent-libio.jsx). Libio keeps its own fixed palette; it reads as
@@ -12,7 +14,9 @@ import {
 const SAFE_TOP_PAD = 'calc(var(--safe-top) + 24px)';
 
 // ─── Common components ────────────────────────────────────────────────────────
-export function LibioBookCover({ color, width = 44, height = 64 }) {
+export function LibioBookCover({ color, cover, title, width = 44, height = 64 }) {
+  const [failed, setFailed] = React.useState(false);
+  const showImage = cover && !failed;
   return (
     <div style={{
       width, height, borderRadius: 6, background: color, flexShrink: 0,
@@ -20,14 +24,21 @@ export function LibioBookCover({ color, width = 44, height = 64 }) {
       boxShadow: '2px 2px 8px rgba(44,36,24,0.15)',
       position: 'relative', overflow: 'hidden',
     }}>
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%)',
-      }} />
-      <div style={{
-        width: '100%', height: 1, background: 'rgba(255,255,255,0.2)',
-        position: 'absolute', top: '30%', left: 0,
-      }} />
+      {!showImage && <>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%)',
+        }} />
+        <div style={{
+          width: '100%', height: 1, background: 'rgba(255,255,255,0.2)',
+          position: 'absolute', top: '30%', left: 0,
+        }} />
+      </>}
+      {showImage && (
+        <img src={cover} alt={title ? `Cover of ${title}` : 'Book cover'}
+          loading="lazy" onError={() => setFailed(true)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      )}
     </div>
   );
 }
@@ -179,10 +190,7 @@ export function LibioLogSessionSheet({ book, onClose, onSave }) {
             padding: '12px 14px', background: '#FFF8F0',
             borderRadius: 12, marginBottom: 22, border: '0.5px solid #EAE0D4',
           }}>
-            <div style={{
-              width: 32, height: 44, borderRadius: 4, background: book.color,
-              flexShrink: 0, boxShadow: '1px 1px 4px rgba(44,36,24,0.15)',
-            }} />
+            <LibioBookCover color={book.color} cover={book.cover} title={book.title} width={32} height={44} />
             <div>
               <p style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600, color: '#2C2418', lineHeight: 1.3 }}>{book.title}</p>
               <p style={{ fontSize: 12, color: '#A89880', marginTop: 2, fontFamily: "'DM Sans', sans-serif" }}>{book.author}</p>
@@ -505,7 +513,7 @@ function LibioLibraryScreen({ books, onBookTap, onAddBook }) {
               borderBottom: i < currentBooks.length - 1 ? '0.5px solid #EAE0D4' : 'none',
               cursor: 'pointer',
             }}>
-              <LibioBookCover color={book.color} width={44} height={64} />
+              <LibioBookCover color={book.color} cover={book.cover} title={book.title} width={44} height={64} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                   <h3 style={{ fontFamily: "'Lora', serif", fontSize: 15, fontWeight: 600, color: '#2C2418', lineHeight: 1.3, flex: 1, minWidth: 0,
@@ -604,8 +612,21 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
         Back
       </button>
       <div className="intent-scroll" style={{ height: '100%', overflowY: 'auto' }}>
-        <div style={{ height: 220, background: book.color, position: 'relative', flexShrink: 0 }}>
+        <div style={{ height: 220, background: book.color, position: 'relative', flexShrink: 0, overflow: 'hidden' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%)' }} />
+          {book.cover && (
+            <>
+              {/* Blurred cover wash fills the band, sharp cover floats centered */}
+              <img src={book.cover} alt="" aria-hidden="true" style={{
+                position: 'absolute', inset: '-20px', width: 'calc(100% + 40px)', height: 'calc(100% + 40px)',
+                objectFit: 'cover', filter: 'blur(24px) brightness(0.7)', opacity: 0.6,
+              }} />
+              <img src={book.cover} alt={`Cover of ${book.title}`} style={{
+                position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                height: 168, width: 'auto', borderRadius: 6, boxShadow: '0 6px 24px rgba(44,36,24,0.35)',
+              }} />
+            </>
+          )}
         </div>
         <div style={{ padding: '20px 20px 100px' }}>
           <div style={{ marginBottom: 20 }}>
@@ -845,11 +866,58 @@ function LibioDiscoveryScreen({ onBack }) {
 }
 
 // ─── Add Book Screen ──────────────────────────────────────────────────────────
+// Centered hint/empty/error state for the search screen.
+function LibioSearchHint({ icon, title, body }) {
+  const glyphs = {
+    search: <><circle cx="11" cy="11" r="7" stroke="#C4956A" strokeWidth="1.6"/><path d="M16.5 16.5L21 21" stroke="#C4956A" strokeWidth="1.6" strokeLinecap="round"/></>,
+    empty: <path d="M5 7h14M5 12h14M5 17h9" stroke="#C4956A" strokeWidth="1.6" strokeLinecap="round"/>,
+    warn: <><path d="M12 8v5" stroke="#C4956A" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="16.5" r="0.4" fill="#C4956A" stroke="#C4956A" strokeWidth="1.2"/><path d="M12 3l9 16H3z" stroke="#C4956A" strokeWidth="1.6" strokeLinejoin="round"/></>,
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingTop: 70, paddingLeft: 24, paddingRight: 24 }}>
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16, opacity: 0.9 }}>
+        {glyphs[icon] || glyphs.search}
+      </svg>
+      <h3 style={{ fontFamily: "'Lora', serif", fontSize: 17, fontWeight: 600, color: '#2C2418', marginBottom: 8 }}>{title}</h3>
+      <p style={{ fontSize: 13, color: '#A89880', lineHeight: 1.5, maxWidth: 260 }}>{body}</p>
+    </div>
+  );
+}
+
 function LibioAddBookScreen({ onBack, onAddToShelf }) {
-  const [query, setQuery] = React.useState('stoic');
+  const [query, setQuery] = React.useState('');
   const [shelfPicker, setShelfPicker] = React.useState(null);
   const [added, setAdded] = React.useState({});
-  const results = query.trim().length > 0 ? LIBIO_SEARCH_RESULTS : [];
+  const [results, setResults] = React.useState([]);
+  const [status, setStatus] = React.useState('idle'); // idle | loading | ok | error
+  const inputRef = React.useRef(null);
+
+  // Autofocus the search field when the screen slides in.
+  React.useEffect(() => {
+    const id = setTimeout(() => inputRef.current && inputRef.current.focus(), 350);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Debounced live search against the global catalog, with in-flight abort so a
+  // fast typist never sees stale results land out of order.
+  React.useEffect(() => {
+    const q = query.trim();
+    if (!q) { setResults([]); setStatus('idle'); return; }
+
+    setStatus('loading');
+    const controller = new AbortController();
+    const id = setTimeout(async () => {
+      try {
+        const books = await searchBooks(q, { signal: controller.signal, limit: 20 });
+        setResults(books);
+        setStatus('ok');
+      } catch (err) {
+        if (err.name !== 'AbortError') setStatus('error');
+      }
+    }, 350);
+
+    return () => { clearTimeout(id); controller.abort(); };
+  }, [query]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2', position: 'relative' }}>
@@ -871,8 +939,9 @@ function LibioAddBookScreen({ onBack, onAddToShelf }) {
             <circle cx="11" cy="11" r="7" stroke="#A89880" strokeWidth="1.8"/>
             <path d="M16.5 16.5L21 21" stroke="#A89880" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+          <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
             placeholder="Search by title, author, or ISBN"
+            autoComplete="off" autoCorrect="off" autoCapitalize="words"
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: '#2C2418', minWidth: 0 }}
           />
           {query.length > 0 && (
@@ -881,15 +950,57 @@ function LibioAddBookScreen({ onBack, onAddToShelf }) {
         </div>
       </div>
       <div className="intent-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 40px' }}>
-        {results.map((book, i) => (
+        {/* Idle — no query yet */}
+        {status === 'idle' && (
+          <LibioSearchHint
+            icon="search"
+            title="Find any book"
+            body="Search millions of titles by name, author, or ISBN."
+          />
+        )}
+
+        {/* Loading */}
+        {status === 'loading' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60, gap: 14 }}>
+            <div className="libio-spinner" style={{
+              width: 26, height: 26, borderRadius: '50%',
+              border: '2.5px solid #EAE0D4', borderTopColor: '#C4956A',
+            }} />
+            <p style={{ fontSize: 13, color: '#A89880', fontFamily: "'DM Sans', sans-serif" }}>Searching…</p>
+          </div>
+        )}
+
+        {/* Error */}
+        {status === 'error' && (
+          <LibioSearchHint
+            icon="warn"
+            title="Couldn't reach the catalog"
+            body="Check your connection and try again."
+          />
+        )}
+
+        {/* No results */}
+        {status === 'ok' && results.length === 0 && (
+          <LibioSearchHint
+            icon="empty"
+            title="No matches"
+            body={`Nothing found for "${query.trim()}". Try a different spelling or the author's name.`}
+          />
+        )}
+
+        {/* Results */}
+        {status === 'ok' && results.map((book, i) => (
           <div key={book.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: i < results.length - 1 ? '0.5px solid #EAE0D4' : 'none' }}>
-            <div style={{ width: 40, height: 56, borderRadius: 5, background: book.color, flexShrink: 0, boxShadow: '1px 2px 6px rgba(44,36,24,0.14)' }} />
+            <BookCover book={book} width={40} height={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600, color: '#2C2418', lineHeight: 1.3, marginBottom: 2 }}>{book.title}</p>
-              <p style={{ fontSize: 12, color: '#A89880' }}>{book.author}</p>
+              <p style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600, color: '#2C2418', lineHeight: 1.3, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</p>
+              <p style={{ fontSize: 12, color: '#A89880', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.author}</p>
+              <p style={{ fontSize: 11, color: '#C2B6A2', marginTop: 2 }}>
+                {[book.genre, book.year, book.totalPages ? `${book.totalPages} pp` : null].filter(Boolean).join(' · ')}
+              </p>
             </div>
             {added[book.id] ? (
-              <span style={{ fontSize: 13, color: '#A89880', fontFamily: "'DM Sans', sans-serif" }}>✓</span>
+              <span style={{ fontSize: 15, color: '#7A8C7E', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>✓</span>
             ) : (
               <button onClick={() => setShelfPicker(book)} style={{
                 width: 28, height: 28, borderRadius: 999,
@@ -996,15 +1107,20 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
     setScreen('main');
   };
 
-  // Add a searched book to a shelf for real
+  // Add a searched book to a shelf for real, carrying its real metadata
+  // (page count, genre, cover) through from the catalog.
   const handleAddToShelf = (book, shelf) => {
     setBooks(prev => {
       const exists = ['reading','read','wantToRead','paused'].some(s => (prev[s] || []).some(b => b.id === book.id));
       if (exists) return prev;
-      const totalPages = 250;
+      const totalPages = book.totalPages || 250; // fall back when the record omits it
       const entry = {
-        ...book, genre: 'Philosophy', currentPage: 0, totalPages,
-        progress: shelf === 'read' ? 100 : 0, quotes: [], rating: 0,
+        ...book,
+        genre: book.genre || 'General',
+        currentPage: shelf === 'read' ? totalPages : 0,
+        totalPages,
+        progress: shelf === 'read' ? 100 : 0,
+        quotes: [], rating: 0,
         ...(shelf === 'read' ? { finishedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } : {}),
       };
       return { ...prev, [shelf]: [...(prev[shelf] || []), entry] };

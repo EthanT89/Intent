@@ -49,6 +49,26 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          {
+            // Book cover thumbnails — cache aggressively; they never change.
+            urlPattern: /^https:\/\/covers\.openlibrary\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'book-covers',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Catalog search — serve cached instantly, refresh in the background.
+            urlPattern: /^https:\/\/openlibrary\.org\/search\.json.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'book-search',
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
     }),
