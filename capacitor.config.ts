@@ -4,20 +4,26 @@ import type { CapacitorConfig } from '@capacitor/cli';
 //
 // Strategy: "B on A" — a thin native app that loads your live, hosted PWA.
 //
-//   • Set INTENT_URL to your deployed app (e.g. https://intent.yourdomain.com)
-//     and the native app becomes a thin client over it. Push to the repo →
-//     your host rebuilds → the app shows the new version on next launch. No
-//     rebuilding or re-signing the native binary to ship updates.
+//   • By default it loads the live GitHub Pages deploy (DEFAULT_URL below), so
+//     the native app is a thin client: push to the repo → Pages rebuilds → the
+//     app shows the new version on next launch. No rebuilding or re-signing the
+//     native binary to ship updates.
 //
-//   • Leave INTENT_URL unset and the app bundles the local `dist/` build, so it
-//     runs fully offline out of the box (updates then require a native rebuild).
+//   • Override the target with the INTENT_URL env var (e.g. a custom domain
+//     like https://intent.yourdomain.com).
 //
-// After changing INTENT_URL, re-run `npm run native:sync` to bake it in.
+//   • Set INTENT_URL="" (empty) to instead bundle the local `dist/` build, so
+//     the app runs fully offline (updates then require a native rebuild).
+//
+// After changing the target, re-run `npm run native:sync` to bake it in.
 //
 // Note: localStorage is scoped per origin, so data does NOT carry between the
 // bundled origin and a remote URL. Pick one mode and stick with it.
 
-const remoteUrl = process.env.INTENT_URL?.trim();
+const DEFAULT_URL = 'https://ethant89.github.io/Intent/';
+const remoteUrl = process.env.INTENT_URL === undefined
+  ? DEFAULT_URL
+  : process.env.INTENT_URL.trim();
 
 const config: CapacitorConfig = {
   appId: 'com.ethanthornberg.intent',

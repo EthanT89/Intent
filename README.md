@@ -17,27 +17,27 @@ npm run preview  # serve the production build locally
 
 The repo is already initialized with a GitHub Pages deploy workflow. To go live:
 
-```bash
-# 1. Create the repo on github.com (public, no README), then:
-git remote add origin https://github.com/<you>/Intent.git
-git push -u origin main
-```
+**Already connected and live:** the repo is at
+[`EthanT89/Intent`](https://github.com/EthanT89/Intent) and auto-deploys to
+GitHub Pages on every push. The app is hosted at:
 
-2. On GitHub: **Settings → Pages → Source: "GitHub Actions"**.
+### 👉 https://ethant89.github.io/Intent/
 
-Every push to `main` now builds and deploys automatically. The app will be at
-`https://<you>.github.io/Intent/`.
+Every `git push origin main` rebuilds and redeploys it automatically (~1 min).
 
-> GitHub Pages is free for **public** repos. If you want the repo private,
+> GitHub Pages is free for **public** repos. If you ever make the repo private,
 > either upgrade to GitHub Pro or deploy the `dist/` folder to Vercel/Netlify
 > instead (both auto-deploy from GitHub on free tiers).
 
 ## Install on your phone
 
-- **iPhone**: open the Pages URL in Safari → Share → **Add to Home Screen**.
-- **Android**: open in Chrome → menu → **Install app**.
+Open **https://ethant89.github.io/Intent/** on your phone:
 
-The app works offline and stores all data on-device (localStorage).
+- **iPhone**: in Safari → Share → **Add to Home Screen**.
+- **Android**: in Chrome → menu → **Install app**.
+
+The app works offline and stores all data on-device (localStorage). For a more
+native feel (no browser chrome), see the Capacitor section below.
 
 **Updates:** the service worker auto-updates. After you push a change, the
 phone picks it up the next time you open the app (close + reopen once if it
@@ -50,43 +50,39 @@ app wrapper — a proper icon, no Safari chrome, splash screen — that **loads 
 live hosted app**. The shell is a thin client: once it points at your deployed
 URL, every `git push` updates the app with no rebuild or re-signing.
 
-This is the **"native shell over your hosted PWA"** setup. Two pieces:
+It's already wired to load the live deploy
+(**https://ethant89.github.io/Intent/**) by default, so the native app updates
+the instant you push — no rebuild. Build it once:
 
-### A. Host it on your own domain (recommended)
-
-Serve the app from a subdomain of your portfolio (e.g. `intent.yourdomain.com`).
-The build uses relative paths, so it runs at any URL unchanged.
-
-- Easiest: keep the GitHub Pages deploy, then **repo Settings → Pages → Custom
-  domain → `intent.yourdomain.com`**, and add a `CNAME` DNS record at your
-  domain pointing there. GitHub provisions HTTPS automatically.
-- Or deploy `dist/` anywhere your portfolio already lives (Vercel/Netlify/your
-  own server). Any static host works.
-
-A domain you control also makes the iOS "Add to Home Screen" install cleaner —
-and it's the URL the native shell will load.
-
-### B. Build the native shell
+### Build the native shell
 
 Prereqs: **Android** needs [Android Studio](https://developer.android.com/studio).
 **iOS** needs a Mac with Xcode (the iOS project can only be generated/built on
 macOS). The native projects are generated artifacts — not committed — so you
-create them locally once:
+create them locally once (`android/` is already generated on this machine):
 
 ```bash
 npm install
-
-# Point the shell at your hosted app so updates are instant (see A).
-# Leave this unset to bundle the local build instead (offline out of the box,
-# but updates then need a rebuild).
-#   PowerShell:  $env:INTENT_URL = "https://intent.yourdomain.com"
-#   bash:        export INTENT_URL="https://intent.yourdomain.com"
-
 npm run native:add:android      # scaffold android/ (run native:add:ios on a Mac)
 npm run native:icons            # generate app icons + splash from assets/
 npm run native:android          # build web + sync + open in Android Studio
 # iOS (on a Mac):  npm run native:ios
 ```
+
+**Where it loads from** — by default the live GitHub Pages URL above. To change
+it, set `INTENT_URL` before `npm run native:sync`:
+
+```bash
+# Custom domain (Option A — e.g. a subdomain of your portfolio):
+#   PowerShell:  $env:INTENT_URL = "https://intent.yourdomain.com"
+#   bash:        export INTENT_URL="https://intent.yourdomain.com"
+# Bundle the local build for offline-first instead (updates need a rebuild):
+#   PowerShell:  $env:INTENT_URL = ""
+```
+
+To put it on your own domain later: **repo Settings → Pages → Custom domain →
+`intent.yourdomain.com`**, add a matching `CNAME` DNS record, then point
+`INTENT_URL` at it. The build uses relative paths, so it runs at any URL.
 
 In Android Studio / Xcode, press **Run** to install on a connected device.
 
