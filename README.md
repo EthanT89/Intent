@@ -37,7 +37,24 @@ Open **https://ethant89.github.io/Intent/** on your phone:
 - **Android**: in Chrome → menu → **Install app**.
 
 The app works offline and stores all data on-device (localStorage). For a more
-native feel (no browser chrome), see the Capacitor section below.
+native feel (no browser chrome), see the Capacitor section below. To back that
+data up to your own server and sync across devices, see **Cloud backup** below.
+
+## Cloud backup & sync (optional)
+
+By default all data lives only on the device. To automatically back it up to a
+server you control (and sync across devices), stand up the tiny reusable store
+API — one endpoint that can serve every app you build, namespaced by `app`:
+
+1. Follow [`backend/README.md`](backend/README.md) to deploy `backend/store.js`
+   to your portfolio (Vercel `api/store.js`) with a free Upstash Redis DB.
+2. Set `VITE_SYNC_URL` + `VITE_SYNC_TOKEN` (see [`.env.example`](.env.example)).
+
+Then **Settings → Backup & sync** shows live status and a manual "Sync now".
+Syncing is automatic and debounced; last-write-wins across devices. Leave the
+env vars unset and the app stays happily local-only. For quick local testing
+without deploying, run `node scripts/dev-sync-server.mjs` and point
+`VITE_SYNC_URL` at `http://localhost:8787/api/store`.
 
 **Updates:** the service worker auto-updates. After you push a change, the
 phone picks it up the next time you open the app (close + reopen once if it

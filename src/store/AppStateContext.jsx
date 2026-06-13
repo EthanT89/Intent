@@ -3,6 +3,7 @@ import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
 import { PILLARS } from '../pillars/registry.js';
+import { useCloudSync } from '../lib/cloudSync.js';
 
 // All app data lives here, split into independently-persisted slices.
 // Adding a pillar with its own data = add a slice here (or persist inside the
@@ -43,7 +44,21 @@ export function AppStateProvider({ children }) {
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
-  const [firstUse] = usePersistentState('intent.firstUse', () => new Date().toISOString());
+  const [firstUse, setFirstUse] = usePersistentState('intent.firstUse', () => new Date().toISOString());
+
+  // ── Cloud sync (optional) ───────────────────────────────────────────────────
+  // The full app state as one document. Last-write-wins across devices.
+  const snapshot = { settings, coffee, books, routines, deepwork, firstUse };
+  const hydrate = React.useCallback((data) => {
+    if (!data || typeof data !== 'object') return;
+    if (data.settings) setSettings(data.settings);
+    if (data.coffee) setCoffee(data.coffee);
+    if (data.books) setBooks(data.books);
+    if (data.routines) setRoutines(data.routines);
+    if (data.deepwork) setDeepwork(data.deepwork);
+    if (data.firstUse) setFirstUse(data.firstUse);
+  }, [setSettings, setCoffee, setBooks, setRoutines, setDeepwork, setFirstUse]);
+  const sync = useCloudSync(snapshot, hydrate);
 
   const value = useMemo(() => {
     // Settings helpers ------------------------------------------------------
@@ -130,8 +145,9 @@ export function AppStateProvider({ children }) {
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, eraseAllData,
+      sync,
     };
-  }, [settings, coffee, books, routines, deepwork, firstUse]);
+  }, [settings, coffee, books, routines, deepwork, firstUse, sync]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

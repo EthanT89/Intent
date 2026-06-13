@@ -80,6 +80,46 @@ function SettingRow({ label, hint, children, divider = true, onClick }) {
   );
 }
 
+// Cloud sync status + manual trigger. When sync isn't configured (no server
+// env), it reads as a quiet "local only" with a pointer to set it up.
+function SyncRow({ sync }) {
+  const STATUS = {
+    disabled:   { dot: '#C2B6A2', text: 'Local only',     hint: 'Cloud backup not set up yet' },
+    connecting: { dot: '#C4956A', text: 'Connecting…',    hint: 'Checking your backup' },
+    idle:       { dot: '#7A8C7E', text: 'Backed up',      hint: 'Synced to your server' },
+    syncing:    { dot: '#C4956A', text: 'Syncing…',       hint: 'Saving changes' },
+    synced:     { dot: '#7A8C7E', text: 'Backed up',      hint: 'All changes saved' },
+    offline:    { dot: '#C2B6A2', text: 'Offline',        hint: 'Will sync when back online' },
+    error:      { dot: '#B8453E', text: 'Sync error',     hint: 'Tap to retry' },
+  };
+  const s = STATUS[sync?.status] || STATUS.disabled;
+  const when = sync?.lastSyncedAt
+    ? new Date(sync.lastSyncedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : null;
+  const enabled = sync?.enabled;
+  const hint = enabled && when ? `Last backup ${when}` : s.hint;
+
+  return (
+    <SettingRow
+      label={
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
+          {s.text}
+        </span>
+      }
+      hint={hint}
+      divider={false}
+      onClick={enabled ? () => sync.syncNow() : undefined}
+    >
+      {enabled ? (
+        <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.amber }}>
+          {sync.status === 'syncing' ? '…' : 'Sync now'}
+        </span>
+      ) : null}
+    </SettingRow>
+  );
+}
+
 function ColorSwatches({ value, options, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
@@ -272,7 +312,7 @@ function Chevron() {
 function SettingsContent() {
   const {
     settings, setSetting, patchSettings,
-    exportData, eraseAllData, firstUse,
+    exportData, eraseAllData, firstUse, sync,
   } = useApp();
 
   const [confirmReset, setConfirmReset] = React.useState(false);
@@ -399,10 +439,16 @@ function SettingsContent() {
         </SettingRow>
       </SettingsCard>
 
+      {/* ── Backup & sync ───────────────────────────────────────────────── */}
+      <SettingsSectionLabel>Backup &amp; sync</SettingsSectionLabel>
+      <SettingsCard>
+        <SyncRow sync={sync} />
+      </SettingsCard>
+
       {/* ── Data ────────────────────────────────────────────────────────── */}
       <SettingsSectionLabel>Data</SettingsSectionLabel>
       <SettingsCard>
-        <SettingRow label="Export data" hint="Download as JSON" onClick={exportData}>
+        <SettingRow label="Export data" hint="Download a JSON copy" onClick={exportData}>
           <Chevron />
         </SettingRow>
         <SettingRow
