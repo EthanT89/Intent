@@ -884,7 +884,7 @@ function LibioSearchHint({ icon, title, body }) {
   );
 }
 
-function LibioAddBookScreen({ onBack, onAddToShelf }) {
+function LibioAddBookScreen({ onBack, onAddToShelf, active }) {
   const [query, setQuery] = React.useState('');
   const [shelfPicker, setShelfPicker] = React.useState(null);
   const [added, setAdded] = React.useState({});
@@ -892,11 +892,18 @@ function LibioAddBookScreen({ onBack, onAddToShelf }) {
   const [status, setStatus] = React.useState('idle'); // idle | loading | ok | error
   const inputRef = React.useRef(null);
 
-  // Autofocus the search field when the screen slides in.
+  // Autofocus the search field when the screen is actually shown — NOT on mount.
+  // All Libio screens are mounted side-by-side (inactive ones translated off to
+  // the right), so focusing while off-screen makes the browser scroll the
+  // container horizontally and blanks the whole app. Gate on `active` and pass
+  // preventScroll so focus never moves the viewport.
   React.useEffect(() => {
-    const id = setTimeout(() => inputRef.current && inputRef.current.focus(), 350);
+    if (!active) return;
+    const id = setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus({ preventScroll: true });
+    }, 350);
     return () => clearTimeout(id);
-  }, []);
+  }, [active]);
 
   // Debounced live search against the global catalog, with in-flight abort so a
   // fast typist never sees stale results land out of order.
@@ -1133,8 +1140,15 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
     background: '#FAF7F2',
   };
 
+  // Safety net: the off-screen screens (translated right) live in this
+  // overflow:hidden container. If anything ever focus-scrolls it sideways, the
+  // visible screen would slide out of view. Snap any horizontal scroll back to 0.
+  const rootRef = React.useRef(null);
+  const pinScroll = () => { const el = rootRef.current; if (el && el.scrollLeft !== 0) el.scrollLeft = 0; };
+
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#FAF7F2' }}>
+    <div ref={rootRef} onScroll={pinScroll}
+      style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#FAF7F2' }}>
 
       {/* Main screens */}
       <div style={{ ...slideStyle, transform: screen === 'main' ? 'translateX(0)' : 'translateX(-100%)', opacity: screen === 'main' ? 1 : 0, pointerEvents: screen === 'main' ? 'auto' : 'none' }}>
@@ -1177,7 +1191,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
 
       {/* Add Book */}
       <div style={{ ...slideStyle, transform: screen === 'addBook' ? 'translateX(0)' : 'translateX(100%)', opacity: screen === 'addBook' ? 1 : 0, pointerEvents: screen === 'addBook' ? 'auto' : 'none' }}>
-        <LibioAddBookScreen onBack={() => setScreen('main')} onAddToShelf={handleAddToShelf} />
+        <LibioAddBookScreen active={screen === 'addBook'} onBack={() => setScreen('main')} onAddToShelf={handleAddToShelf} />
       </div>
 
       {/* Log Session Sheet */}
