@@ -1,0 +1,65 @@
+name: Build iOS .ipa (unsigned)
+
+# Builds an UNSIGNED .ipa of the Intent native shell on a free GitHub-hosted
+# macOS runner (free for public repos). Download the artifact, then sign + install
+# it from Windows with a free Apple ID using Sideloadly or AltStore — no Mac and
+# no paid Apple Developer account required. See docs/ios-install.md.
+#
+# Run it: GitHub → Actions tab → "Build iOS .ipa (unsigned)" → Run workflow.
+
+on:
+  workflow_dispatch:        # manual button in the Actions tab
+  push:
+    tags: ['ios-*']         # ...or push a tag like ios-v1 to trigger a build
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Generate iOS project (Capacitor)
+        # ios/ is a generated artifact (gitignored), so regenerate it here.
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build unsigned .ipa
+        run: |
+          set -eo pipefail
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          APP_PATH="build/Build/Products/Release-iphoneos/App.app"
+          if [ ! -d "$APP_PATH" ]; then echo "App.app not found"; exit 1; fi
+          mkdir -p Payload
+          cp -R "$APP_PATH" "Payload/App.app"
+          zip -qq -r Intent-unsigned.ipa Payload
+          echo "Built $(du -h Intent-unsigned.ipa | cut -f1) ipa"
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Intent-unsigned-ipa
+          path: ios/App/Intent-unsigned.ipa
+          if-no-files-found: error
