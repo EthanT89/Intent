@@ -341,6 +341,9 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, o
   const currentBook = books.reading[0];
   const otherCurrent = books.reading.slice(1);
   const hasAnyBooks = ['reading','read','wantToRead','paused'].some(s => (books[s] || []).length > 0);
+  // Live figures for the streak + yearly-goal pills.
+  const a = computeReadingAnalytics(books);
+  const goalTotal = (stats && stats.goal && stats.goal.total) || 20;
   return (
     <div className="intent-scroll" style={{
       height: '100%', overflowY: 'auto', overflowX: 'hidden',
@@ -451,7 +454,7 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, o
             <span style={{ fontSize: 16 }}>🔥</span>
             <span style={{ fontSize: 11, color: '#A89880', fontWeight: 500, letterSpacing: 0.4, textTransform: 'uppercase' }}>Streak</span>
           </div>
-          <p style={{ fontSize: 24, fontWeight: 700, color: '#2C2418', fontFamily: "'Lora', serif" }}>{stats.currentStreak}</p>
+          <p style={{ fontSize: 24, fontWeight: 700, color: '#2C2418', fontFamily: "'Lora', serif" }}>{a.streak}</p>
           <p style={{ fontSize: 11, color: '#A89880' }}>days in a row</p>
         </div>
         <div style={{ flex: 1, background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: '14px 16px' }}>
@@ -460,9 +463,9 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, o
             <span style={{ fontSize: 11, color: '#A89880', fontWeight: 500, letterSpacing: 0.4, textTransform: 'uppercase' }}>{new Date().getFullYear()} Goal</span>
           </div>
           <p style={{ fontSize: 24, fontWeight: 700, color: '#2C2418', fontFamily: "'Lora', serif" }}>
-            {stats.goal.current}<span style={{ fontSize: 13, color: '#A89880', fontWeight: 400 }}>/{stats.goal.total}</span>
+            {a.booksThisYear}<span style={{ fontSize: 13, color: '#A89880', fontWeight: 400 }}>/{goalTotal}</span>
           </p>
-          <LibioProgressBar pct={(stats.goal.current / stats.goal.total) * 100} height={3} />
+          <LibioProgressBar pct={(a.booksThisYear / goalTotal) * 100} height={3} />
         </div>
       </div>
 
