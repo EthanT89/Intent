@@ -29,6 +29,20 @@ export function isThisMonth(iso) {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
 }
 
+export function isThisYear(iso) {
+  if (!iso) return false;
+  return new Date(iso).getFullYear() === new Date().getFullYear();
+}
+
+// Monday-start week key (YYYY-MM-DD of that week's Monday) for bucketing.
+export function weekStart(d = new Date()) {
+  const out = new Date(d);
+  const day = (out.getDay() + 6) % 7; // 0 = Monday
+  out.setDate(out.getDate() - day);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
 export function timeAgo(iso) {
   if (!iso) return '';
   const then = new Date(iso);

@@ -9,6 +9,7 @@ import { StatsScreen } from './screens/StatsScreen.jsx';
 import { SettingsScreen, SettingsSheet } from './screens/SettingsScreen.jsx';
 import { LogPullModal, RecipeDetailModal, AddRecipeModal } from './pillars/coffee/components.jsx';
 import { LibioApp, LibioStatsScreen, LibioLogSessionSheet } from './pillars/reading/LibioApp.jsx';
+import { FinishCelebration } from './pillars/reading/FinishCelebration.jsx';
 import { LIBIO_STATS_DATA } from './pillars/reading/data.js';
 
 // ── Swipeable full-screen layer (Libio) ───────────────────────────────────────
@@ -131,16 +132,9 @@ export default function App() {
 
   // Reading session sheet (shared by Today pill + Libio)
   const [readingSessionBook, setReadingSessionBook] = React.useState(null);
-  const handleSaveReadingSession = (pagesRead) => {
+  const handleSaveReadingSession = (pagesRead, finish = false) => {
     if (!readingSessionBook) return;
-    setBooks(prev => ({
-      ...prev,
-      reading: prev.reading.map(b => {
-        if (b.id !== readingSessionBook.id) return b;
-        const newPage = Math.min(b.totalPages, b.currentPage + pagesRead);
-        return { ...b, currentPage: newPage, progress: Math.round((newPage / b.totalPages) * 100) };
-      }),
-    }));
+    app.logReadingSession(readingSessionBook, { pages: pagesRead, finish });
     setReadingSessionBook(null);
   };
 
@@ -337,6 +331,16 @@ export default function App() {
           open={settingsOpen && settings.settingsPresentation === 'sheet'}
           onClose={() => setSettingsOpen(false)}
         />
+
+        {/* Book-finished celebration — triggered from anywhere a book is finished */}
+        {app.celebration && (
+          <FinishCelebration
+            book={app.celebration.book}
+            booksThisYear={app.celebration.booksThisYear}
+            onClose={app.dismissCelebration}
+            onFindNext={() => { app.dismissCelebration(); setTab('library'); }}
+          />
+        )}
       </div>
     </UIContext.Provider>
   );

@@ -2,6 +2,7 @@ import { PILLAR_COLORS } from '../../theme/tokens.js';
 import { ReadingPill } from './ReadingPill.jsx';
 import { LibioApp, LibioStatsScreen, LibioLogSessionSheet } from './LibioApp.jsx';
 import { LIBIO_STATS_DATA } from './data.js';
+import { isThisYear } from '../../lib/dates.js';
 
 // Reading is the one pillar that takes over the whole screen (the embedded
 // Libio app) instead of opening an in-shell Section — `fullScreen: true`
@@ -20,11 +21,13 @@ export default {
   statsData: LIBIO_STATS_DATA,
   getStats(app) {
     const read = app.books.read || [];
-    const pagesRead = [...read, ...(app.books.reading || []), ...(app.books.paused || [])]
-      .reduce((a, b) => a + (b.currentPage || 0), 0);
+    const booksThisYear = read.filter(b => isThisYear(b.finishedDate ? new Date(b.finishedDate) : null)).length;
+    const pagesThisYear = (app.books.sessions || [])
+      .filter(s => isThisYear(s.date ? new Date(s.date) : null))
+      .reduce((a, s) => a + (s.pages || 0), 0);
     return [
-      { number: String(read.length), label: 'books finished' },
-      { number: pagesRead.toLocaleString(), label: 'pages read' },
+      { number: String(booksThisYear), label: 'books this year' },
+      { number: pagesThisYear.toLocaleString(), label: 'pages this year' },
       { number: String(app.books.reading.length), label: 'currently reading' },
     ];
   },

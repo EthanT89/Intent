@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { greetingForNow } from '../../lib/dates.js';
+import { greetingForNow, isThisYear, weekStart, dateKey, addDays } from '../../lib/dates.js';
 import {
   LIBIO_STATS_DATA, LIBIO_DISCOVERY_DATA,
 } from './data.js';
@@ -12,6 +12,17 @@ import { BookCover } from './BookCover.jsx';
 // a distinct app living inside Intent.
 
 const SAFE_TOP_PAD = 'calc(var(--safe-top) + 24px)';
+
+// Convert a stored finished-date label ("Jun 15, 2026") or ISO string into the
+// YYYY-MM-DD a <input type="date"> expects. Falls back to today.
+function toDateInput(label) {
+  if (!label) return '';
+  const d = new Date(label);
+  if (isNaN(d.getTime())) return '';
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 // ─── Common components ────────────────────────────────────────────────────────
 export function LibioBookCover({ color, cover, title, width = 44, height = 64 }) {
@@ -143,6 +154,7 @@ function LibioTabBar({ activeTab, onTabChange }) {
 // ─── Log Session Sheet ────────────────────────────────────────────────────────
 export function LibioLogSessionSheet({ book, onClose, onSave }) {
   const [currentPage, setCurrentPage] = React.useState('');
+  const [finishChecked, setFinishChecked] = React.useState(false);
   const [date] = React.useState(() =>
     new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   );
@@ -153,10 +165,12 @@ export function LibioLogSessionSheet({ book, onClose, onSave }) {
   const isWarning = entered !== null && entered < lastPage;
   const isOver = entered !== null && entered > book.totalPages;
   const isValid = entered !== null && entered > lastPage && entered <= book.totalPages;
+  const canSave = finishChecked || isValid;
 
   const handleSave = () => {
+    if (finishChecked) { onSave(isValid ? pagesRead : 0, true); onClose(); return; }
     if (!isValid) return;
-    onSave(pagesRead);
+    onSave(pagesRead, false);
     onClose();
   };
 
@@ -228,20 +242,49 @@ export function LibioLogSessionSheet({ book, onClose, onSave }) {
               Wow — didn't know there was an extended edition! This one only has {book.totalPages} pages.
             </p>
           )}
-          {isValid && (
+          {isValid && !finishChecked && (
             <p style={{ fontSize: 12, color: '#A89880', fontFamily: "'DM Sans', sans-serif" }}>
               Read {pagesRead} pages · was on p. {lastPage}
             </p>
           )}
+          {finishChecked && (
+            <p style={{ fontSize: 12, color: '#7A8C7E', fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>
+              Marking as finished — no need for the exact page.
+            </p>
+          )}
         </div>
-        <button onClick={handleSave} disabled={!isValid} style={{
+
+        {/* Finish toggle — log this session AND mark the book done in one tap */}
+        <button onClick={() => setFinishChecked(v => !v)} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 14px', marginBottom: 16, cursor: 'pointer', textAlign: 'left',
+          background: finishChecked ? '#F2F5F0' : '#FAF7F2',
+          border: `1px solid ${finishChecked ? '#7A8C7E' : '#EAE0D4'}`, borderRadius: 14,
+        }}>
+          <span style={{
+            width: 22, height: 22, borderRadius: 7, flexShrink: 0,
+            border: `1.5px solid ${finishChecked ? '#7A8C7E' : '#C2B6A2'}`,
+            background: finishChecked ? '#7A8C7E' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {finishChecked && (
+              <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4.5l3.2 3L11 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            )}
+          </span>
+          <span>
+            <span style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 600, color: '#2C2418' }}>I finished the book 🎉</span>
+            <span style={{ display: 'block', fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: '#A89880', marginTop: 1 }}>Logs this session and marks it done</span>
+          </span>
+        </button>
+
+        <button onClick={handleSave} disabled={!canSave} style={{
           width: '100%', padding: '15px',
-          background: '#2C2418', color: '#FAF7F2',
+          background: finishChecked ? '#7A8C7E' : '#2C2418', color: '#FAF7F2',
           border: 'none', borderRadius: 999,
           fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600,
-          cursor: isValid ? 'pointer' : 'default',
-          opacity: isValid ? 1 : 0.35, transition: 'opacity 0.2s',
-        }}>Save session</button>
+          cursor: canSave ? 'pointer' : 'default',
+          opacity: canSave ? 1 : 0.35, transition: 'opacity 0.2s, background 0.2s',
+        }}>{finishChecked ? 'Finish book' : 'Save session'}</button>
       </div>
     </div>
   );
@@ -567,9 +610,10 @@ function LibioLibraryScreen({ books, onBookTap, onAddBook }) {
 }
 
 // ─── Book Detail Screen ───────────────────────────────────────────────────────
-function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook, onMoveToShelf }) {
+function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook, onMoveToShelf, onFinishBook, onSetFinishedDate }) {
   const [rating, setRating] = React.useState(book.rating || 0);
   const [quotes, setQuotes] = React.useState(book.quotes || []);
+  const [editingDate, setEditingDate] = React.useState(false);
   const [addingQuote, setAddingQuote] = React.useState(false);
   const [newQuote, setNewQuote] = React.useState('');
   const [newQuotePage, setNewQuotePage] = React.useState('');
@@ -661,9 +705,38 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
             </div>
           )}
           {shelf === 'read' && (
-            <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <p style={{ fontSize: 11, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 500 }}>Finished</p>
-              {book.finishedDate && <span style={{ fontSize: 12, color: '#2C2418', fontWeight: 600 }}>{book.finishedDate}</span>}
+            <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ fontSize: 11, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 500 }}>Finished</p>
+                <button onClick={() => setEditingDate(v => !v)} style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: '#2C2418',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  {book.finishedDate || 'Set date'}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L18 10l-4-4L4 16v4zM14 6l4 4" stroke="#C4956A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+              {editingDate && (
+                <div style={{ marginTop: 12 }}>
+                  <input
+                    type="date"
+                    defaultValue={toDateInput(book.finishedDate)}
+                    max={toDateInput(new Date().toISOString())}
+                    onChange={e => {
+                      if (!e.target.value) return;
+                      const d = new Date(e.target.value + 'T12:00:00');
+                      onSetFinishedDate && onSetFinishedDate(book.id, d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+                    }}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: 10,
+                      border: '0.5px solid #EAE0D4', background: '#FAF7F2',
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: '#2C2418', outline: 'none',
+                    }}
+                  />
+                  <p style={{ fontSize: 11, color: '#A89880', marginTop: 6 }}>Set when you actually finished it — counts toward that year's total.</p>
+                </div>
+              )}
             </div>
           )}
           {shelf === 'paused' && (
@@ -684,7 +757,7 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
             <button onClick={() => onLogSession(book)} style={primaryBtn}>Log session</button>
           )}
           {shelf === 'reading' && book.progress >= 100 && (
-            <button onClick={() => move('read')} style={primaryBtn}>Mark as finished</button>
+            <button onClick={() => onFinishBook && onFinishBook(book)} style={primaryBtn}>Mark as finished 🎉</button>
           )}
           {shelf === 'wantToRead' && (
             <button onClick={() => move('reading')} style={primaryBtn}>Start reading</button>
@@ -706,7 +779,7 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
                 </button>
               )}
               {book.progress < 100 && (
-                <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+                <button onClick={() => onFinishBook && onFinishBook(book)} style={secondaryBtn}>Mark as read</button>
               )}
               <button onClick={() => onPauseBook && onPauseBook(book)} style={{ ...secondaryBtn, color: '#A89880' }}>
                 <svg width="10" height="11" viewBox="0 0 10 11" fill="none">
@@ -725,13 +798,13 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
           )}
           {shelf === 'wantToRead' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-              <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+              <button onClick={() => onFinishBook && onFinishBook(book)} style={secondaryBtn}>Mark as read</button>
             </div>
           )}
           {shelf === 'paused' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               <button onClick={() => move('wantToRead')} style={secondaryBtn}>Want to read</button>
-              <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+              <button onClick={() => onFinishBook && onFinishBook(book)} style={secondaryBtn}>Mark as read</button>
             </div>
           )}
           <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -801,17 +874,97 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
 }
 
 // ─── Stats Screen (Libio) ─────────────────────────────────────────────────────
-export function LibioStatsScreen({ stats }) {
-  const maxCount = Math.max(...stats.monthlyBooks.map(m => m.count), 1);
+// Build reading analytics from live books + session log.
+function computeReadingAnalytics(books) {
+  const sessions = books.sessions || [];
+  const read = books.read || [];
+  const now = new Date();
+
+  const pagesThisYear = sessions.filter(s => isThisYear(new Date(s.date))).reduce((a, s) => a + (s.pages || 0), 0);
+  const pagesAllTime = sessions.reduce((a, s) => a + (s.pages || 0), 0);
+  const booksThisYear = read.filter(b => isThisYear(b.finishedDate ? new Date(b.finishedDate) : null)).length;
+  const rated = read.filter(b => b.rating > 0);
+  const avgRating = rated.length ? (rated.reduce((a, b) => a + b.rating, 0) / rated.length).toFixed(1) : '—';
+
+  // Reading-day streak (a day with ≥1 session). Today not yet read doesn't break it.
+  const dayset = new Set(sessions.map(s => s.date));
+  let streak = 0;
+  let cursor = new Date();
+  if (!dayset.has(dateKey(cursor))) cursor = addDays(cursor, -1);
+  while (dayset.has(dateKey(cursor))) { streak++; cursor = addDays(cursor, -1); }
+
+  // Pages per day — last 14 days.
+  const perDay = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = addDays(now, -i);
+    const k = dateKey(d);
+    const pages = sessions.filter(s => s.date === k).reduce((a, s) => a + (s.pages || 0), 0);
+    perDay.push({ label: d.toLocaleDateString('en-US', { weekday: 'narrow' }), pages, today: i === 0 });
+  }
+
+  // Pages per week — last 8 weeks (Mon-start buckets).
+  const perWeek = [];
+  for (let w = 7; w >= 0; w--) {
+    const ws = weekStart(addDays(now, -w * 7));
+    const we = addDays(ws, 7);
+    const pages = sessions.filter(s => { const sd = new Date(s.date + 'T12:00:00'); return sd >= ws && sd < we; })
+      .reduce((a, s) => a + (s.pages || 0), 0);
+    perWeek.push({ label: ws.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }), pages, current: w === 0 });
+  }
+
+  // Books finished per month this year.
+  const perMonth = Array.from({ length: 12 }, (_, m) => ({ month: new Date(2000, m, 1).toLocaleDateString('en-US', { month: 'short' }), count: 0 }));
+  read.forEach(b => { if (b.finishedDate) { const d = new Date(b.finishedDate); if (isThisYear(d)) perMonth[d.getMonth()].count++; } });
+
+  const recentFinished = [...read]
+    .filter(b => b.finishedDate)
+    .sort((a, b) => new Date(b.finishedDate) - new Date(a.finishedDate))
+    .slice(0, 5);
+
+  return { pagesThisYear, pagesAllTime, booksThisYear, avgRating, streak, perDay, perWeek, perMonth, recentFinished, hasData: sessions.length > 0 || read.length > 0 };
+}
+
+function MiniBars({ data, valueKey, highlightKey, color = '#C4956A', height = 70 }) {
+  const max = Math.max(...data.map(d => d[valueKey]), 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: data.length > 10 ? 3 : 6, height }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, height: '100%', justifyContent: 'flex-end' }}>
+          <div style={{
+            width: '100%', borderRadius: '3px 3px 0 0', minHeight: 3,
+            background: d[valueKey] > 0 ? (d[highlightKey] ? '#2C2418' : color) : '#EAE0D4',
+            height: d[valueKey] > 0 ? `${(d[valueKey] / max) * (height - 18)}px` : '3px',
+            transition: 'height 0.4s ease',
+          }} />
+          <span style={{ fontSize: 8.5, color: '#A89880', whiteSpace: 'nowrap' }}>{d.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function LibioStatsScreen() {
+  const { books } = useApp();
+  const a = computeReadingAnalytics(books);
+  const card = { background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 20, padding: 20, marginBottom: 16 };
+  const cardLabel = { fontSize: 12, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 16, fontWeight: 500 };
   return (
     <div className="intent-scroll" style={{ height: '100%', overflowY: 'auto', padding: `${SAFE_TOP_PAD} 20px 100px`, fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2' }}>
       <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 600, color: '#2C2418', marginBottom: 24 }}>Stats</h1>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+
+      {!a.hasData && (
+        <div style={{ ...card, textAlign: 'center', padding: '40px 24px' }}>
+          <h3 style={{ fontFamily: "'Lora', serif", fontSize: 17, fontWeight: 600, color: '#2C2418', marginBottom: 8 }}>No reading logged yet</h3>
+          <p style={{ fontSize: 13, color: '#A89880', lineHeight: 1.5 }}>Log a session or finish a book and your trends will appear here.</p>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Books this year', value: stats.booksThisYear, unit: 'books' },
-          { label: 'Total pages', value: stats.totalPages.toLocaleString(), unit: 'pages' },
-          { label: 'Current streak', value: stats.currentStreak, unit: 'days' },
-          { label: 'Avg rating', value: stats.avgRating, unit: '/ 5 ★' },
+          { label: 'Books this year', value: a.booksThisYear, unit: 'books' },
+          { label: 'Pages this year', value: a.pagesThisYear.toLocaleString(), unit: 'pages' },
+          { label: 'Reading streak', value: a.streak, unit: 'days' },
+          { label: 'Avg rating', value: a.avgRating, unit: '/ 5 ★' },
         ].map((m, i) => (
           <div key={i} style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: '16px 14px' }}>
             <p style={{ fontSize: 11, color: '#A89880', marginBottom: 8, fontWeight: 500, letterSpacing: 0.3 }}>{m.label}</p>
@@ -822,34 +975,37 @@ export function LibioStatsScreen({ stats }) {
           </div>
         ))}
       </div>
-      <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 20, padding: 20, marginBottom: 16 }}>
-        <p style={{ fontSize: 12, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 16, fontWeight: 500 }}>Books Read per Month</p>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 80 }}>
-          {stats.monthlyBooks.map((m, i) => (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' }}>
-              <div style={{
-                width: '100%', borderRadius: '4px 4px 0 0',
-                background: m.count > 0 ? '#C4956A' : '#EAE0D4',
-                height: m.count > 0 ? `${(m.count / maxCount) * 68}px` : '4px',
-                transition: 'height 0.4s ease', minHeight: 4,
-              }} />
-              <span style={{ fontSize: 9, color: '#A89880', letterSpacing: 0.2 }}>{m.month.slice(0,1)}</span>
+
+      <div style={card}>
+        <p style={cardLabel}>Pages per day · last 14 days</p>
+        <MiniBars data={a.perDay} valueKey="pages" highlightKey="today" />
+      </div>
+
+      <div style={card}>
+        <p style={cardLabel}>Pages per week · last 8 weeks</p>
+        <MiniBars data={a.perWeek} valueKey="pages" highlightKey="current" />
+      </div>
+
+      <div style={card}>
+        <p style={cardLabel}>Books finished per month · {new Date().getFullYear()}</p>
+        <MiniBars data={a.perMonth} valueKey="count" highlightKey="none" />
+      </div>
+
+      {a.recentFinished.length > 0 && (
+        <div style={{ ...card, marginBottom: 0 }}>
+          <p style={cardLabel}>Recently finished</p>
+          {a.recentFinished.map((b, i) => (
+            <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: i < a.recentFinished.length - 1 ? 12 : 0, marginBottom: i < a.recentFinished.length - 1 ? 12 : 0, borderBottom: i < a.recentFinished.length - 1 ? '0.5px solid #EAE0D4' : 'none' }}>
+              <LibioBookCover color={b.color} cover={b.cover} title={b.title} width={30} height={42} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600, color: '#2C2418', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.title}</p>
+                <p style={{ fontSize: 12, color: '#A89880' }}>{b.finishedDate}</p>
+              </div>
+              {b.rating > 0 && <span style={{ fontSize: 12, color: '#C4956A' }}>{'★'.repeat(b.rating)}</span>}
             </div>
           ))}
         </div>
-      </div>
-      <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 20, padding: 20 }}>
-        <p style={{ fontSize: 12, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 16, fontWeight: 500 }}>Top Genres</p>
-        {stats.topGenres.map((g, i) => (
-          <div key={i} style={{ marginBottom: i < stats.topGenres.length - 1 ? 14 : 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: '#2C2418', fontWeight: 500 }}>{g.genre}</span>
-              <span style={{ fontSize: 13, color: '#A89880' }}>{g.pct}%</span>
-            </div>
-            <LibioProgressBar pct={g.pct} height={5} />
-          </div>
-        ))}
-      </div>
+      )}
     </div>
   );
 }
@@ -1069,7 +1225,7 @@ function LibioAddBookScreen({ onBack, onAddToShelf, active }) {
 
 // ─── LibioApp root — the full embedded app ────────────────────────────────────
 export function LibioApp({ initialTab, onLogSessionExternal }) {
-  const { books, setBooks, settings } = useApp();
+  const { books, setBooks, settings, finishBook, setBookFinishedDate } = useApp();
   const [tab, setTab] = React.useState(initialTab || 'home');
   const [screen, setScreen] = React.useState('main'); // main | bookDetail | discovery | addBook
   const [selectedBook, setSelectedBook] = React.useState(null);
@@ -1221,12 +1377,16 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
       {/* Book Detail */}
       <div style={{ ...slideStyle, transform: screen === 'bookDetail' ? 'translateX(0)' : 'translateX(100%)', opacity: screen === 'bookDetail' ? 1 : 0, pointerEvents: screen === 'bookDetail' ? 'auto' : 'none' }}>
         {selectedBook && (() => {
-          const detailShelf = findShelf(selectedBook);
-          const isPrimary = detailShelf === 'reading' && books.reading[0] && books.reading[0].id === selectedBook.id;
+          // Always render the LIVE copy from state, not the stale snapshot taken
+          // when the card was tapped — so finishing/logging reflects immediately.
+          const live = ['reading', 'read', 'wantToRead', 'paused']
+            .map(s => (books[s] || []).find(b => b.id === selectedBook.id)).find(Boolean) || selectedBook;
+          const detailShelf = findShelf(live);
+          const isPrimary = detailShelf === 'reading' && books.reading[0] && books.reading[0].id === live.id;
           const hasSiblings = detailShelf === 'reading' && books.reading.length > 1;
           return (
             <LibioBookDetailScreen
-              book={selectedBook}
+              book={live}
               shelf={detailShelf}
               isPrimary={isPrimary}
               hasSiblings={hasSiblings}
@@ -1238,6 +1398,8 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
               onPauseBook={handlePauseBook}
               onResumeBook={handleResumeBook}
               onMoveToShelf={handleMoveToShelf}
+              onFinishBook={(b) => { finishBook(b); setScreen('main'); }}
+              onSetFinishedDate={setBookFinishedDate}
             />
           );
         })()}
