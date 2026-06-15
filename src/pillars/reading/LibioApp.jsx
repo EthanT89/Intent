@@ -1389,6 +1389,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
           const hasSiblings = detailShelf === 'reading' && books.reading.length > 1;
           return (
             <LibioBookDetailScreen
+              key={live.id}
               book={live}
               shelf={detailShelf}
               isPrimary={isPrimary}
