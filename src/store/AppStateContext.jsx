@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
+import { MOVEMENT_SEED, uid } from '../pillars/movement/model.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useCloudSync } from '../lib/cloudSync.js';
 
@@ -23,7 +24,7 @@ export const DEFAULT_SETTINGS = {
   pillarOrder: ['deepwork', 'reading', 'coffee', 'routine', 'movement', 'nourishment', 'reflection'],
   pillarVis: {
     deepwork: false,
-    movement: false,
+    movement: true,
     routine: true,
     coffee: true,
     nourishment: false,
@@ -41,6 +42,7 @@ export function AppStateProvider({ children }) {
   const [coffee, setCoffee] = usePersistentState('intent.coffee', { pulls: [], recipes: [] });
   const [books, setBooks] = usePersistentState('intent.books', LIBIO_BOOKS_SEED);
   const [routines, setRoutines] = usePersistentState('intent.routines', { list: [], history: {} });
+  const [movement, setMovement] = usePersistentState('intent.movement', MOVEMENT_SEED);
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -51,16 +53,17 @@ export function AppStateProvider({ children }) {
 
   // ── Cloud sync (optional) ───────────────────────────────────────────────────
   // The full app state as one document. Last-write-wins across devices.
-  const snapshot = { settings, coffee, books, routines, deepwork, firstUse };
+  const snapshot = { settings, coffee, books, routines, movement, deepwork, firstUse };
   const hydrate = React.useCallback((data) => {
     if (!data || typeof data !== 'object') return;
     if (data.settings) setSettings(data.settings);
     if (data.coffee) setCoffee(data.coffee);
     if (data.books) setBooks(data.books);
     if (data.routines) setRoutines(data.routines);
+    if (data.movement) setMovement(data.movement);
     if (data.deepwork) setDeepwork(data.deepwork);
     if (data.firstUse) setFirstUse(data.firstUse);
-  }, [setSettings, setCoffee, setBooks, setRoutines, setDeepwork, setFirstUse]);
+  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setDeepwork, setFirstUse]);
   const sync = useCloudSync(snapshot, hydrate);
 
   const value = useMemo(() => {
@@ -176,11 +179,69 @@ export function AppStateProvider({ children }) {
 
     const dismissCelebration = () => setCelebration(null);
 
+    // Movement (workouts) ----------------------------------------------------
+    const mv = {
+      exercises: movement.exercises || [],
+      workouts: movement.workouts || [],
+      schedule: movement.schedule || { recurring: {}, oneOff: {} },
+      sessions: movement.sessions || [],
+    };
+    const patchMovement = (patch) => setMovement(prev => ({ ...mv, ...prev, ...patch }));
+
+    const saveExercise = (ex) => setMovement(prev => {
+      const list = prev.exercises || [];
+      if (ex.id && list.some(e => e.id === ex.id)) {
+        return { ...prev, exercises: list.map(e => e.id === ex.id ? { ...e, ...ex } : e) };
+      }
+      return { ...prev, exercises: [...list, { ...ex, id: ex.id || uid('ex') }] };
+    });
+    const deleteExercise = (id) => setMovement(prev => ({
+      ...prev,
+      exercises: (prev.exercises || []).filter(e => e.id !== id),
+      // also strip it from any workout templates
+      workouts: (prev.workouts || []).map(w => ({ ...w, items: (w.items || []).filter(it => it.exerciseId !== id) })),
+    }));
+
+    const saveWorkout = (w) => setMovement(prev => {
+      const list = prev.workouts || [];
+      if (w.id && list.some(x => x.id === w.id)) {
+        return { ...prev, workouts: list.map(x => x.id === w.id ? { ...x, ...w } : x) };
+      }
+      return { ...prev, workouts: [...list, { ...w, id: w.id || uid('wk') }] };
+    });
+    const deleteWorkout = (id) => setMovement(prev => {
+      const stripList = (arr) => (arr || []).filter(x => x !== id);
+      const recurring = Object.fromEntries(Object.entries(prev.schedule?.recurring || {}).map(([k, v]) => [k, stripList(v)]));
+      const oneOff = Object.fromEntries(Object.entries(prev.schedule?.oneOff || {}).map(([k, v]) => [k, stripList(v)]));
+      return { ...prev, workouts: (prev.workouts || []).filter(w => w.id !== id), schedule: { recurring, oneOff } };
+    });
+
+    // Scheduling: bucket = 'recurring' (keyed by weekday 0-6) or 'oneOff' (date)
+    const scheduleWorkout = (bucket, key, workoutId) => setMovement(prev => {
+      const sched = { recurring: { ...(prev.schedule?.recurring || {}) }, oneOff: { ...(prev.schedule?.oneOff || {}) } };
+      const cur = sched[bucket][key] || [];
+      if (!cur.includes(workoutId)) sched[bucket][key] = [...cur, workoutId];
+      return { ...prev, schedule: sched };
+    });
+    const unscheduleWorkout = (bucket, key, workoutId) => setMovement(prev => {
+      const sched = { recurring: { ...(prev.schedule?.recurring || {}) }, oneOff: { ...(prev.schedule?.oneOff || {}) } };
+      sched[bucket][key] = (sched[bucket][key] || []).filter(id => id !== workoutId);
+      return { ...prev, schedule: sched };
+    });
+
+    const logWorkoutSession = (session) => setMovement(prev => ({
+      ...prev,
+      sessions: [{ id: uid('ses'), date: today, at: new Date().toISOString(), ...session }, ...(prev.sessions || [])],
+    }));
+    const deleteSession = (id) => setMovement(prev => ({
+      ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
+    }));
+
     // Data -------------------------------------------------------------------
     const exportData = () => {
       const payload = {
         exportedAt: new Date().toISOString(),
-        settings, coffee, books, routines, deepwork,
+        settings, coffee, books, routines, movement, deepwork,
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -202,12 +263,15 @@ export function AppStateProvider({ children }) {
       logReadingSession, finishBook, setBookFinishedDate,
       celebration, dismissCelebration,
       routines, setRoutineList, setRoutineHistory, toggleRoutineItem,
+      movement: mv,
+      saveExercise, deleteExercise, saveWorkout, deleteWorkout,
+      scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
