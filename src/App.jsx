@@ -21,8 +21,11 @@ function SwipeableLayer({ children, onDismiss, accentColor }) {
   const startX = React.useRef(0);
   const startDx = React.useRef(0);
   const widthRef = React.useRef(0);
+  const lastX = React.useRef(0);
+  const lastT = React.useRef(0);
+  const vel = React.useRef(0); // px/ms, +ve = moving right
 
-  const EDGE_ZONE = 28; // px from left edge that initiates the gesture
+  const EDGE_ZONE = 32; // px from left edge that initiates the gesture
 
   const onPointerDown = (e) => {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -32,20 +35,30 @@ function SwipeableLayer({ children, onDismiss, accentColor }) {
     setDragging(true);
     startX.current = e.clientX;
     startDx.current = dx;
+    lastX.current = e.clientX;
+    lastT.current = performance.now();
+    vel.current = 0;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not supported */ }
   };
   const onPointerMove = (e) => {
     if (!dragging) return;
+    const now = performance.now();
+    const dt = now - lastT.current;
+    if (dt > 0) vel.current = (e.clientX - lastX.current) / dt;
+    lastX.current = e.clientX;
+    lastT.current = now;
     const next = Math.max(0, startDx.current + (e.clientX - startX.current));
     setDx(next);
   };
   const onPointerEnd = () => {
     if (!dragging) return;
     setDragging(false);
-    const threshold = widthRef.current * 0.4;
-    if (dx > threshold) {
+    // Commit on either a long-enough drag (30%) OR a rightward flick.
+    const distanceThreshold = widthRef.current * 0.3;
+    const flick = vel.current > 0.35 && dx > 48;
+    if (dx > distanceThreshold || flick) {
       setDx(widthRef.current);
-      setTimeout(() => { onDismiss(); setDx(0); }, 240);
+      setTimeout(() => { onDismiss(); setDx(0); }, 220);
     } else {
       setDx(0);
     }
@@ -56,7 +69,7 @@ function SwipeableLayer({ children, onDismiss, accentColor }) {
   const radius = progress * 24;
 
   return (
-    <div ref={wrapRef} style={{ position: 'absolute', inset: 0, zIndex: 5 }}
+    <div ref={wrapRef} style={{ position: 'absolute', inset: 0, zIndex: 5, touchAction: 'pan-y' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}

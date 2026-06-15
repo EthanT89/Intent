@@ -567,7 +567,7 @@ function LibioLibraryScreen({ books, onBookTap, onAddBook }) {
 }
 
 // ─── Book Detail Screen ───────────────────────────────────────────────────────
-function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook }) {
+function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook, onMoveToShelf }) {
   const [rating, setRating] = React.useState(book.rating || 0);
   const [quotes, setQuotes] = React.useState(book.quotes || []);
   const [addingQuote, setAddingQuote] = React.useState(false);
@@ -595,6 +595,19 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
     }
     return '—';
   };
+
+  const primaryBtn = {
+    width: '100%', padding: '14px', background: '#2C2418', color: '#FAF7F2',
+    border: 'none', borderRadius: 14, fontFamily: "'DM Sans', sans-serif",
+    fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 12,
+  };
+  const secondaryBtn = {
+    flex: 1, padding: '11px', background: 'transparent', color: '#2C2418',
+    border: '0.5px solid #EAE0D4', borderRadius: 12,
+    fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+  };
+  const move = (target) => onMoveToShelf && onMoveToShelf(book, target);
 
   return (
     <div style={{ height: '100%', position: 'relative', fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2' }}>
@@ -634,7 +647,7 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
             <p style={{ fontSize: 14, color: '#A89880', marginBottom: 10 }}>{book.author}</p>
             <LibioTagPill label={book.genre} />
           </div>
-          {book.progress < 100 && shelf !== 'paused' && (
+          {shelf === 'reading' && (
             <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16 }}>
               <p style={{ fontSize: 11, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 12, fontWeight: 500 }}>Progress</p>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 13 }}>
@@ -642,7 +655,15 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
                 <span style={{ color: '#2C2418', fontWeight: 600 }}>{book.progress}%</span>
               </div>
               <LibioProgressBar pct={book.progress} height={6} />
-              <p style={{ fontSize: 12, color: '#A89880', marginTop: 8 }}>Est. finish: {estimatedFinish()}</p>
+              {book.progress >= 100
+                ? <p style={{ fontSize: 12, color: '#7A8C7E', marginTop: 8, fontWeight: 600 }}>You've reached the last page — mark it finished below.</p>
+                : <p style={{ fontSize: 12, color: '#A89880', marginTop: 8 }}>Est. finish: {estimatedFinish()}</p>}
+            </div>
+          )}
+          {shelf === 'read' && (
+            <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <p style={{ fontSize: 11, color: '#A89880', letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: 500 }}>Finished</p>
+              {book.finishedDate && <span style={{ fontSize: 12, color: '#2C2418', fontWeight: 600 }}>{book.finishedDate}</span>}
             </div>
           )}
           {shelf === 'paused' && (
@@ -658,22 +679,25 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
               <LibioProgressBar pct={book.progress} height={6} color="#A89880" trackColor="#F0EAE0" />
             </div>
           )}
+          {/* ── Primary action by shelf ─────────────────────────────────── */}
           {shelf === 'reading' && book.progress < 100 && (
-            <button onClick={() => onLogSession(book)} style={{
-              width: '100%', padding: '14px', background: '#2C2418', color: '#FAF7F2',
-              border: 'none', borderRadius: 14, fontFamily: "'DM Sans', sans-serif",
-              fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 12,
-            }}>Log session</button>
+            <button onClick={() => onLogSession(book)} style={primaryBtn}>Log session</button>
           )}
+          {shelf === 'reading' && book.progress >= 100 && (
+            <button onClick={() => move('read')} style={primaryBtn}>Mark as finished</button>
+          )}
+          {shelf === 'wantToRead' && (
+            <button onClick={() => move('reading')} style={primaryBtn}>Start reading</button>
+          )}
+          {shelf === 'paused' && (
+            <button onClick={() => onResumeBook && onResumeBook(book)} style={primaryBtn}>Resume reading</button>
+          )}
+
+          {/* ── Secondary actions by shelf — every shelf has an exit ─────── */}
           {shelf === 'reading' && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               {!isPrimary && hasSiblings && (
-                <button onClick={() => onMakePrimary && onMakePrimary(book)} style={{
-                  flex: 1, padding: '11px', background: 'transparent', color: '#2C2418',
-                  border: '0.5px solid #EAE0D4', borderRadius: 12,
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}>
+                <button onClick={() => onMakePrimary && onMakePrimary(book)} style={secondaryBtn}>
                   <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
                     <path d="M8 1.5l1.9 4.2 4.6.5-3.4 3.1 1 4.6L8 11.7 3.9 13.9l1-4.6L1.5 6.2l4.6-.5L8 1.5z"
                       stroke="#C4956A" strokeWidth="1.4" strokeLinejoin="round"/>
@@ -681,12 +705,10 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
                   Make primary
                 </button>
               )}
-              <button onClick={() => onPauseBook && onPauseBook(book)} style={{
-                flex: 1, padding: '11px', background: 'transparent', color: '#A89880',
-                border: '0.5px solid #EAE0D4', borderRadius: 12,
-                fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}>
+              {book.progress < 100 && (
+                <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+              )}
+              <button onClick={() => onPauseBook && onPauseBook(book)} style={{ ...secondaryBtn, color: '#A89880' }}>
                 <svg width="10" height="11" viewBox="0 0 10 11" fill="none">
                   <rect x="1" y="1" width="2.5" height="9" rx="0.5" fill="#A89880"/>
                   <rect x="6.5" y="1" width="2.5" height="9" rx="0.5" fill="#A89880"/>
@@ -695,12 +717,22 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
               </button>
             </div>
           )}
+          {shelf === 'read' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => move('reading')} style={secondaryBtn}>Move to reading</button>
+              <button onClick={() => move('wantToRead')} style={secondaryBtn}>Want to read</button>
+            </div>
+          )}
+          {shelf === 'wantToRead' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+            </div>
+          )}
           {shelf === 'paused' && (
-            <button onClick={() => onResumeBook && onResumeBook(book)} style={{
-              width: '100%', padding: '14px', background: '#2C2418', color: '#FAF7F2',
-              border: 'none', borderRadius: 14, fontFamily: "'DM Sans', sans-serif",
-              fontSize: 15, fontWeight: 600, cursor: 'pointer', marginBottom: 16,
-            }}>Resume reading</button>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <button onClick={() => move('wantToRead')} style={secondaryBtn}>Want to read</button>
+              <button onClick={() => move('read')} style={secondaryBtn}>Mark as read</button>
+            </div>
           )}
           <div style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 16, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, color: '#A89880' }}>Your rating</span>
@@ -1114,6 +1146,32 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
     setScreen('main');
   };
 
+  // General shelf transition — the single source of truth for moving a book
+  // between reading / read / wantToRead / paused. Removes it from wherever it is
+  // and re-adds it to the target with shelf-appropriate fields.
+  const handleMoveToShelf = (book, target) => {
+    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    setBooks(prev => {
+      const cleaned = {};
+      for (const s of ['reading', 'read', 'wantToRead', 'paused']) {
+        cleaned[s] = (prev[s] || []).filter(b => b.id !== book.id);
+      }
+      // strip status-specific stamps, then apply the target's
+      let entry = { ...book, pausedDate: undefined, finishedDate: undefined };
+      if (target === 'read') {
+        entry = { ...entry, progress: 100, currentPage: book.totalPages || book.currentPage || 0, finishedDate: today };
+      } else if (target === 'paused') {
+        entry = { ...entry, pausedDate: today };
+      } else if (target === 'wantToRead') {
+        entry = { ...entry, progress: 0, currentPage: 0 }; // not started yet
+      }
+      // reading keeps its current page/progress as-is (so "undo finish" works)
+      cleaned[target] = [...cleaned[target], entry];
+      return { ...prev, ...cleaned };
+    });
+    setScreen('main');
+  };
+
   // Add a searched book to a shelf for real, carrying its real metadata
   // (page count, genre, cover) through from the catalog.
   const handleAddToShelf = (book, shelf) => {
@@ -1179,6 +1237,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
               onMakePrimary={handleMakePrimary}
               onPauseBook={handlePauseBook}
               onResumeBook={handleResumeBook}
+              onMoveToShelf={handleMoveToShelf}
             />
           );
         })()}
