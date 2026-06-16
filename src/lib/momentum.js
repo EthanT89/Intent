@@ -88,6 +88,16 @@ export function pillarStreak(app, id, today = new Date()) {
   return streak;
 }
 
+// Streak milestones worth a small celebration.
+export const STREAK_MILESTONES = [3, 7, 14, 21, 30, 50, 75, 100, 150, 200, 250, 300, 365, 500, 730, 1000];
+
+// Highest milestone reached for a given streak (0 if none yet).
+export function highestMilestone(streak) {
+  let m = 0;
+  for (const x of STREAK_MILESTONES) { if (streak >= x) m = x; else break; }
+  return m;
+}
+
 // A 6-week heatmap grid (rows = weeks, cols = Mon..Sun) for the Stats card.
 export function heatmapWeeks(app, weeks = 6, today = new Date()) {
   const tracked = trackedPillars(app);

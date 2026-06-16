@@ -3,6 +3,9 @@ import { T, applyTheme } from './theme/tokens.js';
 import { TabBar, StubPage, PillarStatStub } from './components/primitives.jsx';
 import { PILLAR_MAP } from './pillars/registry.js';
 import { useApp } from './store/AppStateContext.jsx';
+import { usePersistentState } from './store/usePersistentState.js';
+import { activeStreak, highestMilestone } from './lib/momentum.js';
+import { StreakCelebration } from './components/StreakCelebration.jsx';
 import { UIContext } from './store/uiContext.js';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { StatsScreen } from './screens/StatsScreen.jsx';
@@ -124,6 +127,18 @@ export default function App() {
   const [statsDrill, setStatsDrill] = React.useState(null);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const scrollRef = React.useRef(null);
+
+  // Streak milestone celebration — fires once when the active streak crosses a
+  // milestone. Seeds silently on first run so existing streaks don't spam.
+  const streak = activeStreak(app);
+  const [milestoneSeen, setMilestoneSeen] = usePersistentState('intent.streakMilestone', null);
+  const [streakCelebration, setStreakCelebration] = React.useState(null);
+  React.useEffect(() => {
+    const m = highestMilestone(streak);
+    if (milestoneSeen == null) { setMilestoneSeen(m); return; }
+    if (m > milestoneSeen) { setStreakCelebration(m); setMilestoneSeen(m); }
+    else if (m < milestoneSeen) { setMilestoneSeen(m); } // streak broke — re-arm
+  }, [streak]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Coffee modal state (global — reachable from Today pill, section, detail)
   const [pullModalOpen, setPullModalOpen] = React.useState(false);
@@ -330,6 +345,11 @@ export default function App() {
           open={settingsOpen && settings.settingsPresentation === 'sheet'}
           onClose={() => setSettingsOpen(false)}
         />
+
+        {/* Streak milestone celebration */}
+        {streakCelebration != null && (
+          <StreakCelebration milestone={streakCelebration} onClose={() => setStreakCelebration(null)} />
+        )}
 
         {/* Book-finished celebration — triggered from anywhere a book is finished */}
         {app.celebration && (
