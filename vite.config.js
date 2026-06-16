@@ -29,6 +29,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+        // Add push + notificationclick handlers to the generated service worker.
+        importScripts: ['push-sw.js'],
         // Cache Google Fonts so the app works (and looks right) offline.
         runtimeCaching: [
           {

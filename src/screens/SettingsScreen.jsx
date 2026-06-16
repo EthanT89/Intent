@@ -1,5 +1,6 @@
 import React from 'react';
 import { T, BG_OPTIONS, ACCENT_OPTIONS, PALETTES } from '../theme/tokens.js';
+import { pushSupported, notificationPermission, enablePush, disablePush, syncPushPrefs, prefsFromSettings } from '../lib/push.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useApp, DEFAULT_SETTINGS } from '../store/AppStateContext.jsx';
 import pkg from '../../package.json';
@@ -117,6 +118,92 @@ function SyncRow({ sync }) {
         </span>
       ) : null}
     </SettingRow>
+  );
+}
+
+// Web Push notifications: enable flow + per-reminder controls.
+function fmtHour(h) {
+  const ap = h >= 12 ? 'pm' : 'am'; let hh = h % 12; if (hh === 0) hh = 12;
+  return `${hh}${ap}`;
+}
+function HourField({ value, onChange }) {
+  const btn = { width: 28, height: 28, borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.card, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 15, color: T.ink, lineHeight: 1 };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <button onClick={() => onChange((value + 23) % 24)} style={btn}>−</button>
+      <span style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink, minWidth: 38, textAlign: 'center' }}>{fmtHour(value)}</span>
+      <button onClick={() => onChange((value + 1) % 24)} style={btn}>+</button>
+    </div>
+  );
+}
+
+function NotificationsSection({ settings, setSetting }) {
+  const [status, setStatus] = React.useState(null); // 'enabling' | 'denied' | 'unsupported' | null
+  const supported = pushSupported();
+  const enabled = settings.notifEnabled === true && notificationPermission() === 'granted';
+
+  // Change a pref and push it to the server if notifications are on.
+  const change = (key, val) => {
+    setSetting(key, val);
+    if (enabled) syncPushPrefs(prefsFromSettings({ ...settings, [key]: val }));
+  };
+  const enable = async () => {
+    setStatus('enabling');
+    const r = await enablePush(prefsFromSettings(settings));
+    if (r === 'enabled') { setSetting('notifEnabled', true); setStatus(null); }
+    else setStatus(r);
+  };
+  const disable = async () => { await disablePush(); setSetting('notifEnabled', false); setStatus(null); };
+
+  if (!supported) {
+    return (
+      <SettingsCard>
+        <SettingRow label="Reminders" hint="Add Intent to your home screen first, then reopen to enable." divider={false}>
+          <span style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>Unavailable</span>
+        </SettingRow>
+      </SettingsCard>
+    );
+  }
+
+  return (
+    <SettingsCard>
+      <SettingRow
+        label="Reminders"
+        hint={enabled ? 'Gentle nudges at your times' : 'Get nudged to keep intention'}
+        divider={enabled}
+      >
+        <IOSSwitch checked={enabled} onChange={v => (v ? enable() : disable())} />
+      </SettingRow>
+
+      {status === 'denied' && (
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: '#B8453E', padding: '0 0 12px', lineHeight: 1.5 }}>
+          Notifications are blocked. Enable them for Intent in your device settings, then try again.
+        </div>
+      )}
+
+      {enabled && (
+        <>
+          <SettingRow label="Morning intent" hint="Set the day">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {settings.notifMorning !== false && <HourField value={settings.notifMorningHour ?? 7} onChange={v => change('notifMorningHour', v)} />}
+              <IOSSwitch checked={settings.notifMorning !== false} onChange={v => change('notifMorning', v)} />
+            </div>
+          </SettingRow>
+          <SettingRow label="Evening reflection" hint="Close the loop">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {settings.notifEvening !== false && <HourField value={settings.notifEveningHour ?? 21} onChange={v => change('notifEveningHour', v)} />}
+              <IOSSwitch checked={settings.notifEvening !== false} onChange={v => change('notifEvening', v)} />
+            </div>
+          </SettingRow>
+          <SettingRow label="Streak nudge" hint="Only if nothing's logged that day" divider={false}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              {settings.notifNudges === true && <HourField value={settings.notifNudgeHour ?? 20} onChange={v => change('notifNudgeHour', v)} />}
+              <IOSSwitch checked={settings.notifNudges === true} onChange={v => change('notifNudges', v)} />
+            </div>
+          </SettingRow>
+        </>
+      )}
+    </SettingsCard>
   );
 }
 
@@ -444,28 +531,10 @@ function SettingsContent() {
         </SettingRow>
       </SettingsCard>
 
-      {/* ── Notifications (placeholders until push is wired up) ─────────── */}
+      {/* ── Notifications (Web Push) ────────────────────────────────────── */}
       <SettingsSectionLabel>Notifications</SettingsSectionLabel>
-      <SettingsCard>
-        <SettingRow label="Morning intent" hint="7:30 am — set the day">
-          <IOSSwitch
-            checked={settings.notifMorning !== false}
-            onChange={v => setSetting('notifMorning', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Evening reflection" hint="9:00 pm — close the loop">
-          <IOSSwitch
-            checked={settings.notifEvening !== false}
-            onChange={v => setSetting('notifEvening', v)}
-          />
-        </SettingRow>
-        <SettingRow label="Pillar nudges" hint="Reminders when streaks are at risk" divider={false}>
-          <IOSSwitch
-            checked={settings.notifNudges === true}
-            onChange={v => setSetting('notifNudges', v)}
-          />
-        </SettingRow>
-      </SettingsCard>
+      <NotificationsSection settings={settings} setSetting={setSetting} />
+
 
       {/* ── Presentation ────────────────────────────────────────────────── */}
       <SettingsSectionLabel>This panel</SettingsSectionLabel>

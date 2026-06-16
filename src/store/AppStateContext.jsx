@@ -31,9 +31,13 @@ export const DEFAULT_SETTINGS = {
     reading: true,
     reflection: false,
   },
+  notifEnabled: false,
   notifMorning: true,
+  notifMorningHour: 7,
   notifEvening: true,
+  notifEveningHour: 21,
   notifNudges: false,
+  notifNudgeHour: 20,
   settingsPresentation: 'page',
   readingGoal: 20,
 };
