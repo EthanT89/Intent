@@ -22,10 +22,10 @@ function IntentHeader() {
 
   return (
     <div style={{
-      background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 16,
+      background: `${T.amber}12`, border: `0.5px solid ${T.amber}38`, borderRadius: 16,
       padding: '14px 16px', marginBottom: 18,
     }}>
-      <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 500, color: T.muted, letterSpacing: '0.02em', marginBottom: 6 }}>
+      <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.amber, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 6 }}>
         {evening ? 'today’s intent — how did it go?' : 'today’s intent'}
       </div>
       {editing ? (

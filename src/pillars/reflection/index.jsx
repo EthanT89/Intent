@@ -46,7 +46,7 @@ function ReflectionPill() {
   }
 
   return (
-    <PillarPill onNavigate={() => navigateToPillar('reflection')} cream>
+    <PillarPill onNavigate={() => navigateToPillar('reflection')} style={{ background: `${T.amber}12`, border: `0.5px solid ${T.amber}38` }}>
       <CategoryLabel>{evening ? 'this evening' : 'today’s intent'}</CategoryLabel>
       <div style={{ fontFamily: T.fontSerif, fontStyle: today.intent ? 'italic' : 'normal', fontSize: 16, color: T.ink, lineHeight: 1.6, margin: '0 0 12px', paddingRight: 12 }}>
         {body}
