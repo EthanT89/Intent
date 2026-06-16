@@ -166,6 +166,7 @@ export default function App() {
 
   const ui = React.useMemo(() => ({
     navigateToPillar,
+    goToTab: goTab,
     openSettings: () => setSettingsOpen(true),
     openPullModal: (recipe) => { if (recipe) setPrefillRecipe(recipe); setPullModalOpen(true); },
     openRecipeModal: () => setRecipeModalOpen(true),

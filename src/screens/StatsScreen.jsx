@@ -3,6 +3,7 @@ import { T } from '../theme/tokens.js';
 import { MiniGlyph } from '../components/primitives.jsx';
 import { PILLAR_MAP } from '../pillars/registry.js';
 import { useApp } from '../store/AppStateContext.jsx';
+import { ConsistencyCard } from '../components/ConsistencyCard.jsx';
 
 // Stats overview: one dashboard card per visible pillar, in the user's order.
 // Each card shows the pillar's 2–3 headline numbers (from its getStats) and
@@ -24,6 +25,9 @@ export function StatsScreen({ onDrillDown }) {
         fontFamily: T.fontSerif, fontSize: 28, fontWeight: 600,
         color: T.ink, marginBottom: 20, marginTop: 4,
       }}>Stats</div>
+
+      {/* Consistency overview */}
+      <ConsistencyCard />
 
       {/* Pillar cards */}
       {sections.map((p) => {

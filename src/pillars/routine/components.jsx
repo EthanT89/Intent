@@ -4,6 +4,7 @@ import { PillarPill, CategoryLabel, GroupLabel } from '../../components/primitiv
 import { useApp } from '../../store/AppStateContext.jsx';
 import { useUI } from '../../store/uiContext.js';
 import { dateKey, addDays, todayKey } from '../../lib/dates.js';
+import { haptics } from '../../lib/haptics.js';
 import {
   isActiveDay, dayCompletionPct, computeRoutineStreak, computeItemStreak,
 } from './model.js';
@@ -51,7 +52,7 @@ export function RoutinePill() {
         {routine.items.map((item, i) => {
           const done = !!todayMap[item.id];
           return (
-            <button key={item.id} onClick={e => { e.stopPropagation(); toggleRoutineItem(routine.id, item.id); }} style={{
+            <button key={item.id} onClick={e => { e.stopPropagation(); haptics.tap(); toggleRoutineItem(routine.id, item.id); }} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               width: '100%', background: 'none', border: 'none', cursor: 'pointer',
               padding: '6px 0', textAlign: 'left',
@@ -394,7 +395,7 @@ export function RoutineSection({ onBack }) {
           {routine.items.map((item, i) => {
             const done = !!todayMap[item.id];
             return (
-              <button key={item.id} onClick={() => toggleRoutineItem(routine.id, item.id)} style={{
+              <button key={item.id} onClick={() => { haptics.tap(); toggleRoutineItem(routine.id, item.id); }} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 width: '100%', background: 'none', border: 'none', cursor: 'pointer',
                 padding: '11px 0', textAlign: 'left',

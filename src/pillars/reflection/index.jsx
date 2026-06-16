@@ -4,6 +4,13 @@ import { PillarPill, CategoryLabel, GhostButton, SectionHeader } from '../../com
 import { useUI } from '../../store/uiContext.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { todayKey, dateKey, addDays } from '../../lib/dates.js';
+import { honoredOn } from '../../lib/momentum.js';
+
+// Local labels (avoid importing the registry — it imports this file back).
+const HONOR_LABELS = {
+  reading: 'Reading', movement: 'Movement', routine: 'Routine',
+  coffee: 'Coffee', reflection: 'Reflection', deepwork: 'Deep work',
+};
 
 const ACCENT = PILLAR_COLORS.reflection;
 
@@ -74,11 +81,13 @@ function JournalField({ label, placeholder, value, onSave }) {
 
 // ─── Section ────────────────────────────────────────────────────────────────────
 function ReflectionSection({ onBack }) {
-  const { reflection, setDayIntent, setDayEvening } = useApp();
+  const app = useApp();
+  const { reflection, setDayIntent, setDayEvening } = app;
   const days = reflection.days || {};
   const tKey = todayKey();
   const today = days[tKey] || {};
   const evening = new Date().getHours() >= 17;
+  const honoredToday = honoredOn(app, tKey).filter(id => id !== 'reflection').map(id => HONOR_LABELS[id]);
 
   // This week recap (Mon-first) — light "weekly review".
   const mondayIdx = (new Date().getDay() + 6) % 7;
@@ -107,6 +116,17 @@ function ReflectionSection({ onBack }) {
         <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 16 }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
+        {honoredToday.length > 0 && (
+          <div style={{
+            background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
+            padding: '11px 13px', marginBottom: 16,
+          }}>
+            <span style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Today you honored</span>
+            <div style={{ fontFamily: T.fontSerif, fontSize: 15, color: T.ink, marginTop: 5, lineHeight: 1.4 }}>
+              {honoredToday.join(' · ')}
+            </div>
+          </div>
+        )}
         <JournalField label="Today's intent" placeholder="What matters most today?" value={today.intent} onSave={setDayIntent} />
         <JournalField label="Evening reflection" placeholder="How did it go? What will you carry forward?" value={today.evening} onSave={setDayEvening} />
       </div>

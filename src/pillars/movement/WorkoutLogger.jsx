@@ -4,6 +4,7 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { kindOf, FIELD_META } from './model.js';
 import { BackBar, PrimaryBtn, NumberField, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
+import { haptics } from '../../lib/haptics.js';
 
 // Most recent prior session entry for an exercise (for "last time" + prefill).
 function lastEntryFor(sessions, exerciseId) {
@@ -102,7 +103,7 @@ export function WorkoutLogger({ workout, onClose }) {
         return (
           <div key={i} style={{ background: T.card, border: `0.5px solid ${e.done ? ACCENT : T.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <button onClick={() => patch(i, { done: !e.done })} style={{
+              <button onClick={() => { if (!e.done) haptics.done(); patch(i, { done: !e.done }); }} style={{
                 width: 24, height: 24, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
                 border: `1.5px solid ${e.done ? ACCENT : T.border}`, background: e.done ? ACCENT : 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
