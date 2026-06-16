@@ -1,5 +1,5 @@
 import React from 'react';
-import { T, BG_OPTIONS, ACCENT_OPTIONS } from '../theme/tokens.js';
+import { T, BG_OPTIONS, ACCENT_OPTIONS, PALETTES } from '../theme/tokens.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useApp, DEFAULT_SETTINGS } from '../store/AppStateContext.jsx';
 import pkg from '../../package.json';
@@ -374,6 +374,31 @@ function SettingsContent() {
       {/* ── Appearance ──────────────────────────────────────────────────── */}
       <SettingsSectionLabel>Appearance</SettingsSectionLabel>
       <SettingsCard>
+        <div style={{ padding: '14px 0', borderBottom: `0.5px solid ${T.border}` }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 500, color: T.ink, marginBottom: 2 }}>Palette</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 12 }}>A coordinated mood, one tap</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {PALETTES.map(p => {
+              const active = settings.bgColor === p.bg && settings.accentColor === p.accent;
+              return (
+                <button key={p.name} onClick={() => patchSettings({ bgColor: p.bg, accentColor: p.accent })}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  }}>
+                  <span style={{
+                    width: 40, height: 40, borderRadius: 12, background: p.bg,
+                    border: active ? `2px solid ${T.ink}` : `0.5px solid ${T.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ width: 16, height: 16, borderRadius: '50%', background: p.accent }} />
+                  </span>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 9.5, color: active ? T.ink : T.muted, fontWeight: active ? 600 : 400, maxWidth: 46, textAlign: 'center', lineHeight: 1.2 }}>{p.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <SettingRow label="Background" hint="App canvas color">
           <ColorSwatches
             value={settings.bgColor}

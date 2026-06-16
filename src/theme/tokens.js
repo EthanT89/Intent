@@ -33,6 +33,16 @@ export const THEMES = [
 export const BG_OPTIONS     = ['#E8E0D4', '#F0E9DE', '#EDE3D2', '#DFE4DC', '#E4DEE8'];
 export const ACCENT_OPTIONS = ['#C4956A', '#7A8C7E', '#7C6F8E', '#B8893E', '#5C3A1F', '#8C8597'];
 
+// Curated bg+accent pairings — one tap sets a cohesive mood. The individual
+// swatches below still allow fine-tuning afterward.
+export const PALETTES = [
+  { name: 'Parchment',  bg: '#E8E0D4', accent: '#C4956A' },
+  { name: 'Morning Fog', bg: '#DFE4DC', accent: '#7A8C7E' },
+  { name: 'Lavender Dusk', bg: '#E4DEE8', accent: '#7C6F8E' },
+  { name: 'Sandstone',  bg: '#F0E9DE', accent: '#B8893E' },
+  { name: 'Espresso',   bg: '#EDE3D2', accent: '#5C3A1F' },
+];
+
 const base = THEMES[0];
 
 export const T = {
