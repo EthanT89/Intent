@@ -28,11 +28,11 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          # Optional cloud sync — set these in repo Settings → Secrets and
-          # variables → Actions. VITE_SYNC_URL as a *Variable*, VITE_SYNC_TOKEN
-          # as a *Secret*. Unset = app builds local-only (sync off).
-          VITE_SYNC_URL: ${{ vars.VITE_SYNC_URL }}
-          VITE_SYNC_TOKEN: ${{ secrets.VITE_SYNC_TOKEN }}
+          # Optional cloud sync — set in repo Settings → Secrets and variables →
+          # Actions. Accept the URL and token from EITHER a Variable or a Secret,
+          # so it works regardless of which tab you put them in. Unset = local-only.
+          VITE_SYNC_URL: ${{ vars.VITE_SYNC_URL || secrets.VITE_SYNC_URL }}
+          VITE_SYNC_TOKEN: ${{ secrets.VITE_SYNC_TOKEN || vars.VITE_SYNC_TOKEN }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
