@@ -105,7 +105,6 @@ export function PillarPill({ children, onNavigate, cream = false, style = {} }) 
 export function TabBar({ active, onChange }) {
   const tabs = [
     { id: 'today',   label: 'Today',   icon: TabIconToday },
-    { id: 'phases',  label: 'Phases',  icon: TabIconPhases },
     { id: 'stats',   label: 'Stats',   icon: TabIconStats },
   ];
   return (

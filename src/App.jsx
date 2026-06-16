@@ -226,10 +226,6 @@ export default function App() {
     }
   } else if (tab === 'today') {
     screen = <TodayScreen />;
-  } else if (tab === 'phases') {
-    showTitleBar = true; titleBarText = 'Phases';
-    const DeepWork = PILLAR_MAP.deepwork.Section;
-    screen = <DeepWork onBack={null} />;
   } else if (tab === 'stats') {
     screen = <StatsScreen onDrillDown={goStatsDrill} />;
   }

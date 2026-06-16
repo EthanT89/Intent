@@ -3,6 +3,29 @@ import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { kindOf, FIELD_META } from './model.js';
 import { BackBar, PrimaryBtn, NumberField, ACCENT } from './ui.jsx';
+import { timeAgo } from '../../lib/dates.js';
+
+// Most recent prior session entry for an exercise (for "last time" + prefill).
+function lastEntryFor(sessions, exerciseId) {
+  for (const s of sessions) {
+    const e = (s.entries || []).find(en => en.exerciseId === exerciseId && ((en.sets || []).length || en.duration || en.distance));
+    if (e) return { entry: e, at: s.at || s.date };
+  }
+  return null;
+}
+function summarizeLast(last) {
+  if (!last) return null;
+  const e = last.entry;
+  const when = timeAgo(last.at);
+  if ((e.sets || []).length) {
+    const parts = e.sets.map(s => `${s.weight ? s.weight + '×' : ''}${s.reps ?? ''}`).filter(Boolean);
+    return `Last: ${parts.join(', ')} · ${when}`;
+  }
+  const bits = [];
+  if (e.duration) bits.push(`${e.duration} min`);
+  if (e.distance) bits.push(`${e.distance} mi`);
+  return bits.length ? `Last: ${bits.join(' · ')} · ${when}` : null;
+}
 
 // Log a workout session. Pre-fills each exercise's sets from the workout's
 // targets; you record what you actually did (weight × reps per set, or
@@ -10,18 +33,28 @@ import { BackBar, PrimaryBtn, NumberField, ACCENT } from './ui.jsx';
 export function WorkoutLogger({ workout, onClose }) {
   const { movement, logWorkoutSession } = useApp();
   const exById = Object.fromEntries((movement.exercises || []).map(e => [e.id, e]));
+  const sessions = movement.sessions || [];
 
-  // Seed entries from the workout template.
+  // "Last time" per exercise — shown as a hint and used to prefill.
+  const lastByEx = {};
+  (workout.items || []).forEach(it => { lastByEx[it.exerciseId] = lastEntryFor(sessions, it.exerciseId); });
+
+  // Seed entries: prefer what you did last time, falling back to the template.
   const [entries, setEntries] = React.useState(() => (workout.items || []).map(it => {
     const ex = exById[it.exerciseId];
     const k = kindOf(ex?.kind);
+    const last = lastByEx[it.exerciseId]?.entry;
     const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', done: false };
     if (k.perSet) {
-      const n = Math.max(1, Number(it.sets) || 1);
-      base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' }));
+      if (last && (last.sets || []).length) {
+        base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
+      } else {
+        const n = Math.max(1, Number(it.sets) || 1);
+        base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' }));
+      }
     } else {
-      base.duration = it.duration ?? '';
-      base.distance = it.distance ?? '';
+      base.duration = (last && last.duration) ?? it.duration ?? '';
+      base.distance = (last && last.distance) ?? it.distance ?? '';
       base.sets = [];
     }
     return base;
@@ -78,7 +111,9 @@ export function WorkoutLogger({ workout, onClose }) {
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{e.name}</div>
-                <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>{k.label}</div>
+                <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>
+                  {summarizeLast(lastByEx[e.exerciseId]) || k.label}
+                </div>
               </div>
             </div>
 
@@ -113,6 +148,55 @@ export function WorkoutLogger({ workout, onClose }) {
         style={{ width: '100%', boxSizing: 'border-box', height: 70, resize: 'none', padding: '11px 13px', border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.card, fontFamily: T.fontSans, fontSize: 14, color: T.ink, outline: 'none', marginBottom: 16, lineHeight: 1.5 }} />
 
       <PrimaryBtn onClick={save} color={ACCENT} style={{ opacity: anyData ? 1 : 0.5 }}>Save workout</PrimaryBtn>
+
+      <RestTimer />
     </div>
   );
 }
+
+// Floating rest timer — tap a preset to start a countdown between sets.
+function RestTimer() {
+  const [left, setLeft] = React.useState(0); // seconds remaining; 0 = idle
+  const endRef = React.useRef(0);
+  React.useEffect(() => {
+    if (left <= 0) return;
+    const id = setInterval(() => {
+      const rem = Math.max(0, Math.round((endRef.current - Date.now()) / 1000));
+      setLeft(rem);
+      if (rem <= 0) { clearInterval(id); if (navigator.vibrate) navigator.vibrate(200); }
+    }, 250);
+    return () => clearInterval(id);
+  }, [left > 0]);
+
+  const startSec = (s) => { endRef.current = Date.now() + s * 1000; setLeft(s); };
+  const add = (s) => { endRef.current += s * 1000; setLeft(l => l + s); };
+  const stop = () => { endRef.current = 0; setLeft(0); };
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  return (
+    <div style={{
+      position: 'sticky', bottom: 90, marginTop: 18, zIndex: 20,
+      background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 16,
+      padding: 12, boxShadow: '0 4px 18px rgba(44,36,24,0.12)',
+    }}>
+      {left > 0 ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontFamily: T.fontSerif, fontSize: 26, fontWeight: 700, color: left <= 5 ? '#B8453E' : T.ink, minWidth: 64, textAlign: 'center' }}>{mmss(left)}</span>
+          <button onClick={() => add(15)} style={timerBtn}>+15s</button>
+          <button onClick={stop} style={{ ...timerBtn, background: ACCENT, color: '#FAF7F2', border: 'none', flex: 1 }}>Done</button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.muted, marginRight: 2 }}>Rest</span>
+          {[60, 90, 120, 180].map(s => (
+            <button key={s} onClick={() => startSec(s)} style={{ ...timerBtn, flex: 1 }}>{s < 120 ? `${s}s` : `${s / 60}m`}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+const timerBtn = {
+  padding: '9px 10px', borderRadius: 9, border: `0.5px solid ${T.border}`, background: T.cardCream,
+  fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.ink, cursor: 'pointer',
+};

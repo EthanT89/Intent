@@ -342,8 +342,9 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, o
   const otherCurrent = books.reading.slice(1);
   const hasAnyBooks = ['reading','read','wantToRead','paused'].some(s => (books[s] || []).length > 0);
   // Live figures for the streak + yearly-goal pills.
+  const { settings: appSettings } = useApp();
   const a = computeReadingAnalytics(books);
-  const goalTotal = (stats && stats.goal && stats.goal.total) || 20;
+  const goalTotal = (appSettings && appSettings.readingGoal) || 20;
   return (
     <div className="intent-scroll" style={{
       height: '100%', overflowY: 'auto', overflowX: 'hidden',

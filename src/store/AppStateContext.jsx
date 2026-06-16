@@ -35,6 +35,7 @@ export const DEFAULT_SETTINGS = {
   notifEvening: true,
   notifNudges: false,
   settingsPresentation: 'page',
+  readingGoal: 20,
 };
 
 export function AppStateProvider({ children }) {
@@ -43,6 +44,7 @@ export function AppStateProvider({ children }) {
   const [books, setBooks] = usePersistentState('intent.books', LIBIO_BOOKS_SEED);
   const [routines, setRoutines] = usePersistentState('intent.routines', { list: [], history: {} });
   const [movement, setMovement] = usePersistentState('intent.movement', MOVEMENT_SEED);
+  const [reflection, setReflection] = usePersistentState('intent.reflection', { days: {} });
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -53,7 +55,7 @@ export function AppStateProvider({ children }) {
 
   // ── Cloud sync (optional) ───────────────────────────────────────────────────
   // The full app state as one document. Last-write-wins across devices.
-  const snapshot = { settings, coffee, books, routines, movement, deepwork, firstUse };
+  const snapshot = { settings, coffee, books, routines, movement, reflection, deepwork, firstUse };
   const hydrate = React.useCallback((data) => {
     if (!data || typeof data !== 'object') return;
     if (data.settings) setSettings(data.settings);
@@ -61,9 +63,10 @@ export function AppStateProvider({ children }) {
     if (data.books) setBooks(data.books);
     if (data.routines) setRoutines(data.routines);
     if (data.movement) setMovement(data.movement);
+    if (data.reflection) setReflection(data.reflection);
     if (data.deepwork) setDeepwork(data.deepwork);
     if (data.firstUse) setFirstUse(data.firstUse);
-  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setDeepwork, setFirstUse]);
+  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setReflection, setDeepwork, setFirstUse]);
   const sync = useCloudSync(snapshot, hydrate);
 
   const value = useMemo(() => {
@@ -237,11 +240,21 @@ export function AppStateProvider({ children }) {
       ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
     }));
 
+    // Reflection (daily intent + evening) ------------------------------------
+    const refl = { days: reflection.days || {} };
+    const setDayField = (field, value, dayKey = today) => setReflection(prev => {
+      const days = { ...(prev.days || {}) };
+      days[dayKey] = { ...(days[dayKey] || {}), [field]: value, at: new Date().toISOString() };
+      return { ...prev, days };
+    });
+    const setDayIntent = (text, dayKey = today) => setDayField('intent', text, dayKey);
+    const setDayEvening = (text, dayKey = today) => setDayField('evening', text, dayKey);
+
     // Data -------------------------------------------------------------------
     const exportData = () => {
       const payload = {
         exportedAt: new Date().toISOString(),
-        settings, coffee, books, routines, movement, deepwork,
+        settings, coffee, books, routines, movement, reflection, deepwork,
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -266,12 +279,13 @@ export function AppStateProvider({ children }) {
       movement: mv,
       saveExercise, deleteExercise, saveWorkout, deleteWorkout,
       scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession,
+      reflection: refl, setDayIntent, setDayEvening,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, movement, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, reflection, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

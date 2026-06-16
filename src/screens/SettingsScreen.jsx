@@ -120,6 +120,22 @@ function SyncRow({ sync }) {
   );
 }
 
+// Compact −/value/+ stepper for numeric settings.
+function Stepper({ value, onChange, min = 0, step = 1 }) {
+  const btn = {
+    width: 32, height: 32, borderRadius: 9, border: `0.5px solid ${T.border}`,
+    background: T.card, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 18,
+    color: T.ink, lineHeight: 1,
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <button onClick={() => onChange(Math.max(min, value - step))} style={btn}>−</button>
+      <span style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink, minWidth: 28, textAlign: 'center' }}>{value}</span>
+      <button onClick={() => onChange(value + step)} style={btn}>+</button>
+    </div>
+  );
+}
+
 function ColorSwatches({ value, options, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
@@ -387,6 +403,18 @@ function SettingsContent() {
           <IOSSwitch
             checked={settings.showDate !== false}
             onChange={v => setSetting('showDate', v)}
+          />
+        </SettingRow>
+      </SettingsCard>
+
+      {/* ── Goals ───────────────────────────────────────────────────────── */}
+      <SettingsSectionLabel>Goals</SettingsSectionLabel>
+      <SettingsCard>
+        <SettingRow label="Books per year" hint="Your reading target" divider={false}>
+          <Stepper
+            value={settings.readingGoal ?? 20}
+            min={1} step={1}
+            onChange={v => setSetting('readingGoal', v)}
           />
         </SettingRow>
       </SettingsCard>

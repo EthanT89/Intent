@@ -53,6 +53,11 @@ export default {
   Pill: MovementPill,
   Section: MovementSection,
   StatsScreen: null,
+  getDaily(app) {
+    const tk = dateKey(new Date());
+    const done = (app.movement.sessions || []).some(s => (s.date || dateKey(new Date(s.at))) === tk);
+    return { done };
+  },
   getStats(app) {
     const s = computeMovementStats(app.movement || {});
     return [
