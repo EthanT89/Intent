@@ -3,6 +3,7 @@ import { T } from '../theme/tokens.js';
 import { MiniGlyph } from '../components/primitives.jsx';
 import { PILLAR_MAP } from '../pillars/registry.js';
 import { useApp } from '../store/AppStateContext.jsx';
+import { useUI } from '../store/uiContext.js';
 import { ConsistencyCard } from '../components/ConsistencyCard.jsx';
 
 // Stats overview: one dashboard card per visible pillar, in the user's order.
@@ -12,6 +13,11 @@ import { ConsistencyCard } from '../components/ConsistencyCard.jsx';
 export function StatsScreen({ onDrillDown }) {
   const app = useApp();
   const { settings } = app;
+  const { navigateToPillar } = useUI();
+  // Cards with a real stats drill-down open it (reading is special-cased in App
+  // to show the Libio stats screen); the rest open the pillar's own section,
+  // which holds its history — no dead "coming soon" ends.
+  const openCard = (p) => ((p.StatsScreen || p.id === 'reading') ? onDrillDown(p.id) : navigateToPillar(p.id));
 
   const sections = settings.pillarOrder
     .filter(id => settings.pillarVis[id] !== false)
@@ -35,7 +41,7 @@ export function StatsScreen({ onDrillDown }) {
         return (
           <button
             key={p.id}
-            onClick={() => onDrillDown(p.id)}
+            onClick={() => openCard(p)}
             style={{
               display: 'block', width: '100%', textAlign: 'left',
               background: T.card, border: `0.5px solid ${T.border}`,

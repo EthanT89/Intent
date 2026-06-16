@@ -4,6 +4,7 @@ import { PillarPill, CategoryLabel, Glyph, DayPills } from '../../components/pri
 import { useUI } from '../../store/uiContext.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { MovementSection } from './MovementSection.jsx';
+import { MovementStats } from './MovementStats.jsx';
 import { scheduledFor, computeMovementStats } from './model.js';
 import { dateKey, weekStart, addDays } from '../../lib/dates.js';
 
@@ -52,7 +53,7 @@ export default {
   color: PILLAR_COLORS.movement,
   Pill: MovementPill,
   Section: MovementSection,
-  StatsScreen: null,
+  StatsScreen: MovementStats,
   getDaily(app) {
     const tk = dateKey(new Date());
     const done = (app.movement.sessions || []).some(s => (s.date || dateKey(new Date(s.at))) === tk);

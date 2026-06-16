@@ -27,7 +27,12 @@ const APP = 'intent';
 const KEY = 'state';
 const META_KEY = 'intent.sync.updatedAt'; // local marker of last-synced version
 
-export const syncEnabled = Boolean(BASE && TOKEN);
+// Never sync from the local dev server — it shares the same production store, so
+// dev/preview activity must not read or overwrite real data. Only the built app
+// (GitHub Pages / the native shell) syncs.
+const isDev = import.meta.env.DEV;
+
+export const syncEnabled = Boolean(BASE && TOKEN) && !isDev;
 
 // Stable stringify (sorted keys) so equal state always serializes identically —
 // used both for the wire format dedup and change detection.
