@@ -7,6 +7,7 @@ import { dateKey, addDays, todayKey } from '../../lib/dates.js';
 import { haptics } from '../../lib/haptics.js';
 import {
   isActiveDay, dayCompletionPct, computeRoutineStreak, computeItemStreak,
+  withinWindow, windowLabel, TIME_WINDOWS, matchPreset,
 } from './model.js';
 
 // ─── Today pill — one checklist card per routine scheduled today ─────────────
@@ -54,10 +55,35 @@ export function RoutinePill() {
     );
   }
 
-  // One card per routine active today.
+  // Only surface routines whose time-of-day window is open right now.
+  const activeNow = activeToday.filter(r => withinWindow(r, today));
+
+  // In a gap between windows (e.g. afternoon, between a morning and evening
+  // routine) — point to what's next, but keep the section a tap away.
+  if (activeNow.length === 0) {
+    const nowH = today.getHours() + today.getMinutes() / 60;
+    const upcoming = activeToday
+      .filter(r => r.window && r.window.start > nowH)
+      .sort((a, b) => a.window.start - b.window.start)[0];
+    return (
+      <PillarPill onNavigate={() => navigateToPillar('routine')}>
+        <CategoryLabel>routine</CategoryLabel>
+        <div style={{ paddingRight: 16 }}>
+          <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink, marginBottom: 3 }}>
+            {upcoming ? 'Nothing right now' : 'Routines wrapped for today'}
+          </div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>
+            {upcoming ? `Next: ${upcoming.name} · ${windowLabel(upcoming.window)}` : 'Tap to review or catch up.'}
+          </div>
+        </div>
+      </PillarPill>
+    );
+  }
+
+  // One card per routine open right now.
   return (
     <>
-      {activeToday.map(r => <OneRoutinePill key={r.id} routine={r} today={today} />)}
+      {activeNow.map(r => <OneRoutinePill key={r.id} routine={r} today={today} />)}
     </>
   );
 }
@@ -399,8 +425,24 @@ export function RoutineSection({ onBack, arg }) {
         <div style={{
           fontFamily: T.fontSerif, fontStyle: 'italic',
           fontSize: 14, color: T.muted,
-          marginBottom: 18, lineHeight: 1.5,
+          marginBottom: routine.window ? 8 : 18, lineHeight: 1.5,
         }}>{routine.description}</div>
+      )}
+
+      {/* Time-of-day window */}
+      {routine.window && (
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 18,
+          background: `${accent}14`, color: T.ink, border: `0.5px solid ${accent}44`,
+          borderRadius: 999, padding: '5px 11px',
+          fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke={accent} strokeWidth="1.8"/>
+            <path d="M12 7v5l3 2" stroke={accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {windowLabel(routine.window)}
+        </div>
       )}
 
       {/* Streak + days-on row */}
@@ -580,6 +622,12 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   const [items, setItems] = React.useState(routine.items);
   const [newItemLabel, setNewItemLabel] = React.useState('');
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [timeWindow, setTimeWindow] = React.useState(routine.window || null);
+  const [customMode, setCustomMode] = React.useState(matchPreset(routine.window) === 'custom');
+  const preset = customMode ? 'custom' : matchPreset(timeWindow);
+  const win = timeWindow || { start: 8, end: 17 };
+  const setWinStart = (v) => setTimeWindow({ start: Math.max(0, Math.min(23, v)), end: win.end });
+  const setWinEnd = (v) => setTimeWindow({ start: win.start, end: Math.max(1, Math.min(24, v)) });
 
   const toggleDay = (i) => {
     setDaysOn(prev => prev.includes(i) ? prev.filter(d => d !== i) : [...prev, i].sort());
@@ -600,7 +648,7 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   };
 
   const save = () => {
-    onSave({ ...routine, name: name.trim() || 'Untitled', description: description.trim(), daysOn, items });
+    onSave({ ...routine, name: name.trim() || 'Untitled', description: description.trim(), daysOn, items, window: timeWindow });
   };
 
   return (
@@ -663,6 +711,35 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
           <button onClick={() => setDaysOn([0,1,2,3,4,5,6])} style={presetStyle()}>Every day</button>
           <button onClick={() => setDaysOn([1,2,3,4,5])} style={presetStyle()}>Weekdays</button>
           <button onClick={() => setDaysOn([0,6])} style={presetStyle()}>Weekends</button>
+        </div>
+      </div>
+
+      {/* Time of day */}
+      <GroupLabel>Time of day</GroupLabel>
+      <div style={{
+        background: T.card, border: `0.5px solid ${T.border}`,
+        borderRadius: 12, padding: '14px 16px', marginBottom: 4,
+      }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {TIME_WINDOWS.map(p => {
+            const on = !customMode && preset === p.id;
+            return (
+              <button key={p.id} onClick={() => { setCustomMode(false); setTimeWindow(p.window); }}
+                style={presetStyle(on)}>{p.label}</button>
+            );
+          })}
+          <button onClick={() => { setCustomMode(true); if (!timeWindow) setTimeWindow({ start: 8, end: 17 }); }}
+            style={presetStyle(customMode)}>Custom</button>
+        </div>
+        {customMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
+            <HourStepper label="From" value={win.start} onChange={setWinStart} min={0} max={23} />
+            <span style={{ color: T.muted, fontFamily: T.fontSans, fontSize: 13, marginTop: 16 }}>to</span>
+            <HourStepper label="Until" value={win.end} onChange={setWinEnd} min={1} max={24} />
+          </div>
+        )}
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 12 }}>
+          {timeWindow ? `Shows on Today ${windowLabel(timeWindow)}.` : 'Shows on Today all day.'}
         </div>
       </div>
 
@@ -778,12 +855,38 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   );
 }
 
-function presetStyle() {
+function presetStyle(active = false) {
   return {
-    padding: '6px 12px', borderRadius: 999, border: `0.5px solid ${T.border}`,
-    background: 'transparent', color: T.muted,
-    fontFamily: T.fontSans, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+    padding: '6px 12px', borderRadius: 999,
+    border: `1px solid ${active ? T.pillars.routine : T.border}`,
+    background: active ? `${T.pillars.routine}18` : 'transparent',
+    color: active ? T.ink : T.muted,
+    fontFamily: T.fontSans, fontSize: 12, fontWeight: active ? 600 : 500, cursor: 'pointer',
   };
+}
+
+function fmtHour12(h) {
+  if (h >= 24) return '12am';
+  const ap = h >= 12 ? 'pm' : 'am';
+  let hh = h % 12; if (hh === 0) hh = 12;
+  return `${hh}${ap}`;
+}
+function HourStepper({ label, value, onChange, min, max }) {
+  const btn = {
+    width: 30, height: 30, borderRadius: 8, border: `0.5px solid ${T.border}`,
+    background: 'transparent', color: T.ink, cursor: 'pointer',
+    fontFamily: T.fontSans, fontSize: 16, lineHeight: 1,
+  };
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted, marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={() => onChange(Math.max(min, value - 1))} style={btn}>−</button>
+        <span style={{ flex: 1, textAlign: 'center', fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{fmtHour12(value)}</span>
+        <button onClick={() => onChange(Math.min(max, value + 1))} style={btn}>+</button>
+      </div>
+    </div>
+  );
 }
 function arrowBtnStyle(disabled) {
   return {

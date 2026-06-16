@@ -51,7 +51,7 @@ function ReflectionPill() {
       <div style={{ fontFamily: T.fontSerif, fontStyle: today.intent ? 'italic' : 'normal', fontSize: 16, color: T.ink, lineHeight: 1.6, margin: '0 0 12px', paddingRight: 12 }}>
         {body}
       </div>
-      <GhostButton>{cta}</GhostButton>
+      <GhostButton onClick={() => navigateToPillar('reflection')}>{cta}</GhostButton>
     </PillarPill>
   );
 }
