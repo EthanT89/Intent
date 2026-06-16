@@ -9,17 +9,15 @@ import {
   isActiveDay, dayCompletionPct, computeRoutineStreak, computeItemStreak,
 } from './model.js';
 
-// ─── Today pill — first routine scheduled today, live checklist ──────────────
+// ─── Today pill — one checklist card per routine scheduled today ─────────────
 export function RoutinePill() {
-  const { routines, toggleRoutineItem } = useApp();
+  const { routines } = useApp();
   const { navigateToPillar } = useUI();
   const today = new Date();
-  const tKey = todayKey();
-
-  const routine = routines.list.find(r => isActiveDay(r, today)) || routines.list[0];
+  const list = routines.list || [];
 
   // Empty state — no routines yet
-  if (!routine) {
+  if (list.length === 0) {
     return (
       <PillarPill onNavigate={() => navigateToPillar('routine')}>
         <CategoryLabel>routine</CategoryLabel>
@@ -36,20 +34,57 @@ export function RoutinePill() {
     );
   }
 
+  const activeToday = list.filter(r => isActiveDay(r, today));
+
+  // All routines off today — one compact, quiet card.
+  if (activeToday.length === 0) {
+    let nextDay = '—';
+    for (let i = 1; i < 8; i++) {
+      const d = addDays(today, i);
+      if (list.some(r => isActiveDay(r, d))) { nextDay = d.toLocaleDateString('en-US', { weekday: 'long' }); break; }
+    }
+    return (
+      <PillarPill onNavigate={() => navigateToPillar('routine')}>
+        <CategoryLabel>routine</CategoryLabel>
+        <div style={{ paddingRight: 16 }}>
+          <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink, marginBottom: 3 }}>No routine today</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>Next up {nextDay}.</div>
+        </div>
+      </PillarPill>
+    );
+  }
+
+  // One card per routine active today.
+  return (
+    <>
+      {activeToday.map(r => <OneRoutinePill key={r.id} routine={r} today={today} />)}
+    </>
+  );
+}
+
+// A single routine's checklist card on Today.
+function OneRoutinePill({ routine, today }) {
+  const { routines, toggleRoutineItem } = useApp();
+  const { navigateToPillar } = useUI();
   const history = routines.history[routine.id] || {};
-  const todayMap = history[tKey] || {};
+  const todayMap = history[todayKey()] || {};
   const doneCount = routine.items.filter(it => todayMap[it.id]).length;
+  const allDone = routine.items.length > 0 && doneCount === routine.items.length;
   const streak = computeRoutineStreak(routine, history, today);
 
-  const label = routine.name.toLowerCase() === 'morning' ? 'this morning'
-    : routine.name.toLowerCase() === 'evening' ? 'this evening'
-    : routine.name.toLowerCase();
+  const lower = routine.name.toLowerCase();
+  const label = lower === 'morning' ? 'this morning' : lower === 'evening' ? 'this evening' : lower;
 
   return (
-    <PillarPill onNavigate={() => navigateToPillar('routine')}>
+    <PillarPill onNavigate={() => navigateToPillar('routine', routine.id)}>
       <CategoryLabel>{label}</CategoryLabel>
       <div style={{ paddingRight: 16 }}>
-        {routine.items.map((item, i) => {
+        {routine.items.length === 0 && (
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, padding: '2px 0 6px' }}>
+            No items yet — tap to add some.
+          </div>
+        )}
+        {routine.items.map((item) => {
           const done = !!todayMap[item.id];
           return (
             <button key={item.id} onClick={e => { e.stopPropagation(); haptics.tap(); toggleRoutineItem(routine.id, item.id); }} style={{
@@ -79,10 +114,10 @@ export function RoutinePill() {
           );
         })}
         <div style={{
-          fontFamily: T.fontSans, fontSize: 12, color: T.muted,
+          fontFamily: T.fontSans, fontSize: 12, color: allDone ? T.pillars.routine : T.muted,
           marginTop: 10, paddingTop: 10,
           borderTop: `0.5px solid ${T.border}`,
-        }}>{doneCount} of {routine.items.length} done · {streak} day streak</div>
+        }}>{allDone ? '✓ ' : ''}{doneCount} of {routine.items.length} done · {streak} day streak</div>
       </div>
     </PillarPill>
   );
@@ -198,11 +233,14 @@ function ItemHeatStrip({ routine, history, itemId, endDate }) {
 }
 
 // ─── Routine detail page ─────────────────────────────────────────────────────
-export function RoutineSection({ onBack }) {
+export function RoutineSection({ onBack, arg }) {
   const { routines, toggleRoutineItem, setRoutineList, setRoutineHistory } = useApp();
   const list = routines.list;
   const history = routines.history;
-  const [activeId, setActiveId] = React.useState(list[0] && list[0].id);
+  // Focus the routine passed in (from a Today card), else today's active one, else first.
+  const initialId = (arg && list.some(r => r.id === arg)) ? arg
+    : (list.find(r => isActiveDay(r, new Date())) || list[0] || {}).id;
+  const [activeId, setActiveId] = React.useState(initialId);
   const [editing, setEditing] = React.useState(false);
   const [stripEndOffset, setStripEndOffset] = React.useState(0);
 
@@ -327,17 +365,27 @@ export function RoutineSection({ onBack }) {
         lineHeight: 1.1, marginBottom: 14,
       }}>Routines</div>
 
-      {/* Segmented control */}
+      {/* Segmented control — each chip shows ✓ if complete today, • if active today */}
       <div className="intent-scroll" style={{ display: 'flex', gap: 8, marginBottom: 22, overflowX: 'auto', paddingBottom: 4 }}>
-        {list.map(r => (
-          <button key={r.id} onClick={() => setActiveId(r.id)} style={{
-            padding: '8px 14px', borderRadius: 999, border: 'none',
-            background: activeId === r.id ? T.ink : '#F0EAE0',
-            color: activeId === r.id ? '#FAF7F2' : T.muted,
-            fontFamily: T.fontSans, fontSize: 13, fontWeight: 500,
-            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-          }}>{r.name}</button>
-        ))}
+        {list.map(r => {
+          const sel = activeId === r.id;
+          const activeDay = isActiveDay(r, today);
+          const rHist = history[r.id] || {};
+          const rToday = rHist[tKey] || {};
+          const complete = activeDay && r.items.length > 0 && r.items.every(it => rToday[it.id]);
+          const mark = complete ? '✓ ' : activeDay ? '• ' : '';
+          return (
+            <button key={r.id} onClick={() => setActiveId(r.id)} style={{
+              padding: '8px 14px', borderRadius: 999, border: 'none',
+              background: sel ? T.ink : '#F0EAE0',
+              color: sel ? '#FAF7F2' : T.muted,
+              fontFamily: T.fontSans, fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              <span style={{ color: complete ? (sel ? '#9FD3B0' : T.pillars.routine) : 'inherit' }}>{mark}</span>{r.name}
+            </button>
+          );
+        })}
         <button onClick={createRoutine} style={{
           padding: '8px 12px', borderRadius: 999, border: `1px dashed ${T.border}`,
           background: 'transparent', color: T.muted,

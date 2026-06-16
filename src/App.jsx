@@ -120,6 +120,7 @@ export default function App() {
 
   const [tab, setTab] = React.useState('today');
   const [pillarPage, setPillarPage] = React.useState(null);
+  const [pillarArg, setPillarArg] = React.useState(null); // optional focus payload for a Section
   const [statsDrill, setStatsDrill] = React.useState(null);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const scrollRef = React.useRef(null);
@@ -148,13 +149,14 @@ export default function App() {
     setTab(newTab);
   };
 
-  const navigateToPillar = (id) => {
+  const navigateToPillar = (id, arg = null) => {
     const pillar = PILLAR_MAP[id];
     if (pillar && pillar.fullScreen) {
       // Full-screen pillars (Libio) take over via the 'library' pseudo-tab
       setPillarPage(null); setStatsDrill(null); setTab('library');
       return;
     }
+    setPillarArg(arg);
     setPillarPage(id);
     setStatsDrill(null);
   };
@@ -209,7 +211,7 @@ export default function App() {
     const pillar = PILLAR_MAP[pillarPage];
     if (pillar && pillar.Section) {
       const Section = pillar.Section;
-      screen = <Section onBack={goBack} />;
+      screen = <Section onBack={goBack} arg={pillarArg} />;
     } else {
       screen = <StubPage title={pillar ? pillar.label : pillarPage} accentColor={pillar ? pillar.color : T.amber} onBack={goBack} />;
     }
