@@ -27,14 +27,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        # Sync config is baked into the client (src/lib/cloudSync.js), so no build
+        # env is required. These optional overrides win if you ever set them.
         env:
-          # Optional cloud sync — set in repo Settings → Secrets and variables →
-          # Actions. Accept the URL and token from EITHER a Variable or a Secret,
-          # so it works regardless of which tab you put them in. Unset = local-only.
-          VITE_SYNC_URL: ${{ vars.VITE_SYNC_URL || secrets.VITE_SYNC_URL || 'https://ethanthornberg.dev/api/store' }}
-          # TEMPORARY throwaway token to unblock testing — Ethan will rotate it and
-          # set a real repo Secret named VITE_SYNC_TOKEN, after which delete this literal.
-          VITE_SYNC_TOKEN: ${{ secrets.VITE_SYNC_TOKEN || vars.VITE_SYNC_TOKEN || 'ethan_temp_key_lakjsalsjflkjljtlknaslgouhuicnljJLNAlklsjdginALKFNlkjsfg' }}
+          VITE_SYNC_URL: ${{ vars.VITE_SYNC_URL || secrets.VITE_SYNC_URL }}
+          VITE_SYNC_TOKEN: ${{ secrets.VITE_SYNC_TOKEN || vars.VITE_SYNC_TOKEN }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

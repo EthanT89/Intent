@@ -7,6 +7,14 @@ done, what only you can do (it's behind your logins), and how we verify it.
 
 It's a ~15-minute, one-time setup. After that it's automatic forever.
 
+> **Note (current setup):** since this is a single-user app, the sync **endpoint
+> and token are baked into the client** (`src/lib/cloudSync.js`) — so it works out
+> of the box with no GitHub Variables/Secrets needed. You still need the Upstash DB
+> + the three Vercel env vars (Step 1 & 3); the `SYNC_TOKEN` on Vercel must match
+> the token in `cloudSync.js`. Steps 4–5 (GitHub Variable/Secret) are now optional
+> overrides. To change the token: edit it in `cloudSync.js` **and** `SYNC_TOKEN` on
+> Vercel, then push.
+
 ---
 
 ## How it works (the 30-second mental model)

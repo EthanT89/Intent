@@ -15,8 +15,14 @@
 
 import React from 'react';
 
-const BASE = import.meta.env.VITE_SYNC_URL;
-const TOKEN = import.meta.env.VITE_SYNC_TOKEN;
+// Sync config is baked in by design: this is a single-user personal app, so the
+// endpoint + token live here as defaults and it works out of the box (incl. local
+// dev) with zero build setup. Env vars still override if ever needed.
+// The token is intentionally non-sensitive — anyone with it can only read/write
+// this one personal namespace. To change it: update both values below AND the
+// matching SYNC_TOKEN env var on the portfolio (Vercel), then push.
+const BASE = import.meta.env.VITE_SYNC_URL || 'https://ethanthornberg.dev/api/store';
+const TOKEN = import.meta.env.VITE_SYNC_TOKEN || 'ethan_temp_key_lakjsalsjflkjljtlknaslgouhuicnljJLNAlklsjdginALKFNlkjsfg';
 const APP = 'intent';
 const KEY = 'state';
 const META_KEY = 'intent.sync.updatedAt'; // local marker of last-synced version
