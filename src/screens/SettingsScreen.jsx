@@ -446,11 +446,31 @@ function Chevron() {
 function SettingsContent() {
   const {
     settings, setSetting, patchSettings,
-    exportData, eraseAllData, firstUse, sync,
+    exportData, importData, eraseAllData, firstUse, sync,
   } = useApp();
 
   const [confirmReset, setConfirmReset] = React.useState(false);
   const [confirmErase, setConfirmErase] = React.useState(false);
+  const [importMsg, setImportMsg] = React.useState(null);
+  const fileRef = React.useRef(null);
+
+  const onImportFile = (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // allow re-importing the same file
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let parsed;
+      try { parsed = JSON.parse(reader.result); }
+      catch { setImportMsg({ ok: false, text: "That file isn't valid JSON." }); return; }
+      const res = importData(parsed);
+      setImportMsg(res.ok
+        ? { ok: true, text: `Restored ${res.restored.join(', ')}.` }
+        : { ok: false, text: res.error });
+    };
+    reader.onerror = () => setImportMsg({ ok: false, text: "Couldn't read that file." });
+    reader.readAsText(file);
+  };
 
   const memberSince = new Date(firstUse).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 
@@ -604,6 +624,16 @@ function SettingsContent() {
         <SettingRow label="Export data" hint="Download a JSON copy" onClick={exportData}>
           <Chevron />
         </SettingRow>
+        <SettingRow
+          label="Import data"
+          hint={importMsg ? importMsg.text : 'Restore from an exported file'}
+          onClick={() => fileRef.current && fileRef.current.click()}
+        >
+          <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: importMsg && !importMsg.ok ? '#B8453E' : importMsg && importMsg.ok ? '#7A8C7E' : T.amber }}>
+            {importMsg && importMsg.ok ? '✓' : 'Choose'}
+          </span>
+        </SettingRow>
+        <input ref={fileRef} type="file" accept="application/json,.json" onChange={onImportFile} style={{ display: 'none' }} />
         <SettingRow
           label={
             <span style={{ color: confirmReset ? '#B8453E' : T.ink }}>

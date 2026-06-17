@@ -271,6 +271,22 @@ export function AppStateProvider({ children }) {
       a.click();
       URL.revokeObjectURL(url);
     };
+    // Restore from an exported file. Replaces each slice that's present; unknown
+    // keys are ignored. Returns { ok, restored:[...] } or { ok:false, error }.
+    const importData = (payload) => {
+      if (!payload || typeof payload !== 'object') return { ok: false, error: 'Not a valid Intent file.' };
+      const restored = [];
+      if (payload.settings && typeof payload.settings === 'object') { setSettings({ ...DEFAULT_SETTINGS, ...payload.settings }); restored.push('settings'); }
+      if (payload.coffee) { setCoffee(payload.coffee); restored.push('coffee'); }
+      if (payload.books) { setBooks(payload.books); restored.push('reading'); }
+      if (payload.routines) { setRoutines(payload.routines); restored.push('routines'); }
+      if (payload.movement) { setMovement(payload.movement); restored.push('movement'); }
+      if (payload.reflection) { setReflection(payload.reflection); restored.push('reflection'); }
+      if (payload.deepwork) { setDeepwork(payload.deepwork); restored.push('deep work'); }
+      if (!restored.length) return { ok: false, error: 'No Intent data found in that file.' };
+      return { ok: true, restored };
+    };
+
     const resetSettings = () => setSettings(DEFAULT_SETTINGS);
     const eraseAllData = () => { clearAllAppData(); window.location.reload(); };
 
@@ -289,7 +305,7 @@ export function AppStateProvider({ children }) {
       reflection: refl, setDayIntent, setDayEvening,
       deepwork: dw, startSession, endSession,
       firstUse,
-      exportData, eraseAllData,
+      exportData, importData, eraseAllData,
       sync,
     };
   }, [settings, coffee, books, routines, movement, reflection, deepwork, firstUse, sync, celebration]);
