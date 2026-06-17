@@ -66,10 +66,19 @@ function GearIcon({ color }) {
   );
 }
 
+// Animate the entrance only on the first Today mount per app open — not on every
+// tab switch back to Today.
+let didEnter = false;
+
 export function TodayScreen() {
   const app = useApp();
   const { settings } = app;
   const { openSettings, navigateToPillar } = useUI();
+
+  const animate = React.useRef(!didEnter).current;
+  React.useEffect(() => { didEnter = true; }, []);
+  let _ri = 0;
+  const rise = () => (animate ? { className: 't-rise', style: { animationDelay: `${(_ri++) * 55}ms` } } : {});
 
   const order = settings.pillarOrder;
   const isVisible = (id) => settings.pillarVis[id] !== false;
@@ -133,19 +142,20 @@ export function TodayScreen() {
       )}
 
       {/* Today's intent — the app's namesake */}
-      {visibleCount > 0 && <IntentHeader />}
+      {visibleCount > 0 && <div {...rise()}><IntentHeader /></div>}
 
       {/* Momentum — your consistency at a glance */}
-      {visibleCount > 0 && <MomentumStrip />}
+      {visibleCount > 0 && <div {...rise()}><MomentumStrip /></div>}
 
       {/* Active pillars (not yet done today) */}
       {activeIds.map(id => {
         const Pill = PILLAR_MAP[id].Pill;
-        return <Pill key={id} />;
+        return <div key={id} {...rise()}><Pill /></div>;
       })}
 
       {/* Done today — collapsed */}
       {doneIds.length > 0 && (
+        <div {...rise()}>
         <div style={{ marginTop: activeIds.length ? 14 : 0 }}>
           <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8, paddingLeft: 4 }}>
             Done today
@@ -168,6 +178,7 @@ export function TodayScreen() {
               );
             })}
           </div>
+        </div>
         </div>
       )}
 
