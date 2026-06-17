@@ -15,10 +15,10 @@ export function RoutinePill() {
   const { routines } = useApp();
   const { navigateToPillar } = useUI();
   const today = new Date();
-  const list = routines.list || [];
+  const all = routines.list || [];
 
   // Empty state — no routines yet
-  if (list.length === 0) {
+  if (all.length === 0) {
     return (
       <PillarPill onNavigate={() => navigateToPillar('routine')}>
         <CategoryLabel>routine</CategoryLabel>
@@ -30,6 +30,20 @@ export function RoutinePill() {
           <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>
             Tap to build your first one.
           </div>
+        </div>
+      </PillarPill>
+    );
+  }
+
+  // Paused routines are kept but excluded from Today.
+  const list = all.filter(r => r.disabled !== true);
+  if (list.length === 0) {
+    return (
+      <PillarPill onNavigate={() => navigateToPillar('routine')}>
+        <CategoryLabel>routine</CategoryLabel>
+        <div style={{ paddingRight: 16 }}>
+          <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink, marginBottom: 3 }}>Routines paused</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted }}>Tap to resume one when you're ready.</div>
         </div>
       </PillarPill>
     );
@@ -341,6 +355,8 @@ export function RoutineSection({ onBack, arg }) {
   const streak = computeRoutineStreak(routine, routineHist, today);
   const stripEnd = addDays(today, -stripEndOffset);
   const isActiveToday = isActiveDay(routine, today);
+  const disabled = routine.disabled === true;
+  const resume = () => setRoutineList(prev => prev.map(r => r.id === routine.id ? { ...r, disabled: false } : r));
 
   if (editing) {
     return <EditRoutineScreen
@@ -395,11 +411,12 @@ export function RoutineSection({ onBack, arg }) {
       <div className="intent-scroll" style={{ display: 'flex', gap: 8, marginBottom: 22, overflowX: 'auto', paddingBottom: 4 }}>
         {list.map(r => {
           const sel = activeId === r.id;
+          const off = r.disabled === true;
           const activeDay = isActiveDay(r, today);
           const rHist = history[r.id] || {};
           const rToday = rHist[tKey] || {};
-          const complete = activeDay && r.items.length > 0 && r.items.every(it => rToday[it.id]);
-          const mark = complete ? '✓ ' : activeDay ? '• ' : '';
+          const complete = !off && activeDay && r.items.length > 0 && r.items.every(it => rToday[it.id]);
+          const mark = off ? '⏸ ' : complete ? '✓ ' : activeDay ? '• ' : '';
           return (
             <button key={r.id} onClick={() => setActiveId(r.id)} style={{
               padding: '8px 14px', borderRadius: 999, border: 'none',
@@ -407,6 +424,7 @@ export function RoutineSection({ onBack, arg }) {
               color: sel ? '#FAF7F2' : T.muted,
               fontFamily: T.fontSans, fontSize: 13, fontWeight: 500,
               cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              opacity: off && !sel ? 0.55 : 1,
             }}>
               <span style={{ color: complete ? (sel ? '#9FD3B0' : T.pillars.routine) : 'inherit' }}>{mark}</span>{r.name}
             </button>
@@ -445,6 +463,23 @@ export function RoutineSection({ onBack, arg }) {
         </div>
       )}
 
+      {/* Paused banner */}
+      {disabled && (
+        <div style={{
+          background: `${accent}10`, border: `0.5px solid ${accent}44`, borderRadius: 16,
+          padding: 16, marginBottom: 16,
+        }}>
+          <div style={{ fontFamily: T.fontSerif, fontSize: 16, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Paused</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, lineHeight: 1.5, marginBottom: 14 }}>
+            This routine is hidden from Today and won't affect your streaks. Its history is kept.
+          </div>
+          <button onClick={resume} style={{
+            background: accent, color: '#FAF7F2', border: 'none', borderRadius: 12,
+            padding: '11px 20px', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 14, fontWeight: 600,
+          }}>Resume routine</button>
+        </div>
+      )}
+
       {/* Streak + days-on row */}
       <div style={{
         background: T.card, border: `0.5px solid ${T.border}`,
@@ -475,9 +510,9 @@ export function RoutineSection({ onBack, arg }) {
         </div>
       </div>
 
-      {/* Today's checklist */}
-      <GroupLabel>{isActiveToday ? 'Today' : 'Not scheduled today'}</GroupLabel>
-      {isActiveToday ? (
+      {/* Today's checklist (hidden while paused) */}
+      {!disabled && <GroupLabel>{isActiveToday ? 'Today' : 'Not scheduled today'}</GroupLabel>}
+      {!disabled && (isActiveToday ? (
         <div style={{
           background: T.card, border: `0.5px solid ${T.border}`,
           borderRadius: 16, padding: '6px 16px', marginBottom: 8,
@@ -546,7 +581,7 @@ export function RoutineSection({ onBack, arg }) {
           }
           return '—';
         })()}.</div>
-      )}
+      ))}
 
       {/* 30-day strip */}
       <GroupLabel>Last 30 days</GroupLabel>
@@ -622,6 +657,7 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   const [items, setItems] = React.useState(routine.items);
   const [newItemLabel, setNewItemLabel] = React.useState('');
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [enabled, setEnabled] = React.useState(routine.disabled !== true);
   const [timeWindow, setTimeWindow] = React.useState(routine.window || null);
   const [customMode, setCustomMode] = React.useState(matchPreset(routine.window) === 'custom');
   const preset = customMode ? 'custom' : matchPreset(timeWindow);
@@ -648,7 +684,7 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   };
 
   const save = () => {
-    onSave({ ...routine, name: name.trim() || 'Untitled', description: description.trim(), daysOn, items, window: timeWindow });
+    onSave({ ...routine, name: name.trim() || 'Untitled', description: description.trim(), daysOn, items, window: timeWindow, disabled: !enabled });
   };
 
   return (
@@ -812,6 +848,31 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
           opacity: newItemLabel.trim() ? 1 : 0.35,
         }}>Add</button>
       </div>
+
+      {/* Status — pause without deleting */}
+      <GroupLabel>Status</GroupLabel>
+      <button onClick={() => setEnabled(v => !v)} style={{
+        display: 'flex', width: '100%', alignItems: 'center', gap: 12, textAlign: 'left',
+        background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 12,
+        padding: '14px 16px', cursor: 'pointer',
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 500, color: T.ink }}>{enabled ? 'Active' : 'Paused'}</div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 2 }}>
+            {enabled ? 'Shows on Today and counts toward streaks' : 'Hidden from Today; history kept, streaks unaffected'}
+          </div>
+        </div>
+        <span style={{
+          width: 44, height: 26, borderRadius: 999, flexShrink: 0, position: 'relative',
+          background: enabled ? T.pillars.routine : '#E1D7C8', transition: 'background 0.2s',
+        }}>
+          <span style={{
+            position: 'absolute', top: 3, left: enabled ? 21 : 3, width: 20, height: 20,
+            borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+            boxShadow: '0 1px 3px rgba(44,36,24,0.25)',
+          }} />
+        </span>
+      </button>
 
       {/* Delete */}
       {canDelete && (

@@ -11,14 +11,15 @@ export default {
   Section: RoutineSection,
   StatsScreen: null, // stub for now
   getDaily(app) {
-    const active = (app.routines.list || []).filter(r => isActiveDay(r, new Date()));
+    const active = (app.routines.list || []).filter(r => r.disabled !== true && isActiveDay(r, new Date()));
     if (!active.length) return { done: false };
     const tk = todayKey();
     const done = active.every(r => r.items.length > 0 && isDayComplete(r, (app.routines.history[r.id] || {})[tk]));
     return { done };
   },
   getStats(app) {
-    const primary = app.routines.list[0];
+    const list = app.routines.list || [];
+    const primary = list.find(r => r.disabled !== true) || list[0];
     if (!primary) return [{ number: '—', label: 'no routines' }];
     const history = app.routines.history[primary.id] || {};
     return [
