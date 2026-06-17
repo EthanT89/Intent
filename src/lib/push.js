@@ -43,20 +43,33 @@ async function postSubscription(subscription, prefs) {
   return res.json().catch(() => ({}));
 }
 
-// Request permission + subscribe. Returns 'enabled' | 'denied' | 'unsupported'.
+// Request permission + subscribe. Returns:
+//   'enabled'     — fully on (subscribed + registered with the server)
+//   'pending'     — permission + subscription OK, but the server wasn't reachable
+//                   (e.g. not deployed yet); refreshPush() retries on next launch
+//   'denied'      — permission denied
+//   'unsupported' — no push support (not an installed PWA / unsupported browser)
+//   'error'       — couldn't create a push subscription
 export async function enablePush(prefs) {
   if (!pushSupported()) return 'unsupported';
-  const perm = await Notification.requestPermission();
+  let perm;
+  try { perm = await Notification.requestPermission(); } catch { return 'error'; }
   if (perm !== 'granted') return 'denied';
-  const reg = await navigator.serviceWorker.ready;
-  let sub = await reg.pushManager.getSubscription();
-  if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
-    });
-  }
-  await postSubscription(sub.toJSON(), prefs);
+  let sub;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+      });
+    }
+  } catch { return 'error'; }
+  // Server registration is best-effort: the subscription already exists in the
+  // browser, so if the endpoint is down we still count it enabled and retry later.
+  try { await postSubscription(sub.toJSON(), prefs); }
+  catch { return 'pending'; }
   return 'enabled';
 }
 

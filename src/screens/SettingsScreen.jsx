@@ -153,8 +153,11 @@ function NotificationsSection({ settings, setSetting }) {
   };
   const enable = async () => {
     setStatus('enabling');
-    const r = await enablePush(prefsFromSettings(settings));
-    if (r === 'enabled') { setSetting('notifEnabled', true); setStatus(null); }
+    let r;
+    try { r = await enablePush(prefsFromSettings(settings)); } catch { r = 'error'; }
+    // 'enabled' and 'pending' both mean the user opted in (subscription exists);
+    // keep the toggle on. 'pending' just means the server will sync on next launch.
+    if (r === 'enabled' || r === 'pending') { setSetting('notifEnabled', true); setStatus(r === 'pending' ? 'pending' : null); }
     else setStatus(r);
   };
   const disable = async () => { await disablePush(); setSetting('notifEnabled', false); setStatus(null); };
@@ -188,6 +191,16 @@ function NotificationsSection({ settings, setSetting }) {
       {status === 'denied' && (
         <div style={{ fontFamily: T.fontSans, fontSize: 12, color: '#B8453E', padding: '0 0 12px', lineHeight: 1.5 }}>
           Notifications are blocked. Enable them for Intent in your device settings, then try again.
+        </div>
+      )}
+      {status === 'error' && (
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: '#B8453E', padding: '0 0 12px', lineHeight: 1.5 }}>
+          Couldn't set up notifications. Make sure Intent is installed to your home screen, then try again.
+        </div>
+      )}
+      {status === 'pending' && (
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: '#C4956A', padding: '0 0 12px', lineHeight: 1.5 }}>
+          Enabled on this device — the reminder server isn't reachable yet, so it'll finish connecting next time you open the app.
         </div>
       )}
 
