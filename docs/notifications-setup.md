@@ -43,23 +43,26 @@ working tree — Claude committed them), or `vercel --prod`. The cron registers 
 - Open it → **Settings → Notifications → Reminders** → toggle on → **Allow** when iOS
   asks. Set your morning/evening hours and the streak nudge.
 
-### Test it immediately (optional)
-Trigger the sender manually from your computer:
-```
-curl -H "Authorization: Bearer <CRON_SECRET>" "https://ethanthornberg.dev/api/push/send"
-```
-It returns `{ ok, sent, subs }`. To force a send, temporarily set a reminder's hour
-to the current hour in Settings, then run the curl.
+### Test it immediately
+After enabling, tap **Settings → Notifications → Send test notification** — it pushes
+a test to your phone and reports the result inline. (Or curl the sender:
+`curl -H "Authorization: Bearer <CRON_SECRET>" "https://ethanthornberg.dev/api/push/send"`.)
 
 ## ⚠️ Cron frequency note
-The cron runs **hourly** (`0 * * * *`), so reminders are **hour-granular** (set "7am",
-not "7:30"). On the Vercel **Hobby** plan, cron jobs may be throttled to ~once per day —
-if reminders only fire once daily, either upgrade to Pro, or point a free external
-scheduler (e.g. cron-job.org, every 15 min) at:
-```
-https://ethanthornberg.dev/api/push/send   (header: Authorization: Bearer <CRON_SECRET>)
-```
-and you can ignore the Vercel cron.
+Reminder times are **minute-precise** (e.g. 7:30am), and the sender uses a 90-minute
+**catch-up window**: it delivers a reminder at the first cron tick after its target
+time (and only once per day). So:
+- **Vercel cron runs hourly** (`0 * * * *`) → a 7:30 reminder lands by ~8:00.
+- Want it closer to exact? Point a free external scheduler (e.g. **cron-job.org**,
+  every 15 min) at the sender and you'll get ≤15-min precision:
+  ```
+  https://ethanthornberg.dev/api/push/send   (header: Authorization: Bearer <CRON_SECRET>)
+  ```
+- On the Vercel **Hobby** plan, the built-in cron may be throttled to ~once/day — in
+  that case use the external scheduler above (then the Vercel cron doesn't matter).
+
+The app also re-registers your subscription + timezone on every launch, so it
+self-heals after iOS rotates the subscription or you travel to a new timezone.
 
 ## Notes
 - iOS haptics aren't possible from a web app — only the native Capacitor wrapper can

@@ -1,6 +1,6 @@
 import React from 'react';
 import { T, BG_OPTIONS, ACCENT_OPTIONS, PALETTES } from '../theme/tokens.js';
-import { pushSupported, notificationPermission, enablePush, disablePush, syncPushPrefs, prefsFromSettings } from '../lib/push.js';
+import { pushSupported, notificationPermission, enablePush, disablePush, syncPushPrefs, prefsFromSettings, sendTest } from '../lib/push.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useApp, DEFAULT_SETTINGS } from '../store/AppStateContext.jsx';
 import pkg from '../../package.json';
@@ -122,23 +122,27 @@ function SyncRow({ sync }) {
 }
 
 // Web Push notifications: enable flow + per-reminder controls.
-function fmtHour(h) {
+function fmtTime(h, m) {
   const ap = h >= 12 ? 'pm' : 'am'; let hh = h % 12; if (hh === 0) hh = 12;
-  return `${hh}${ap}`;
+  return `${hh}:${String(m).padStart(2, '0')}${ap}`;
 }
-function HourField({ value, onChange }) {
-  const btn = { width: 28, height: 28, borderRadius: 8, border: `0.5px solid ${T.border}`, background: T.card, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 15, color: T.ink, lineHeight: 1 };
+// Minute-precise time picker (hour ± and 5-min ±).
+function TimeField({ hour, minute, onHour, onMinute }) {
+  const btn = { width: 26, height: 26, borderRadius: 7, border: `0.5px solid ${T.border}`, background: T.card, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 14, color: T.ink, lineHeight: 1, padding: 0 };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <button onClick={() => onChange((value + 23) % 24)} style={btn}>−</button>
-      <span style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink, minWidth: 38, textAlign: 'center' }}>{fmtHour(value)}</span>
-      <button onClick={() => onChange((value + 1) % 24)} style={btn}>+</button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <button onClick={() => onHour((hour + 23) % 24)} style={btn} aria-label="hour down">−</button>
+      <span style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink, minWidth: 54, textAlign: 'center' }}>{fmtTime(hour, minute)}</span>
+      <button onClick={() => onHour((hour + 1) % 24)} style={btn} aria-label="hour up">+</button>
+      <button onClick={() => onMinute((minute + 55) % 60)} style={{ ...btn, marginLeft: 6 }} aria-label="minute down">‹</button>
+      <button onClick={() => onMinute((minute + 5) % 60)} style={btn} aria-label="minute up">›</button>
     </div>
   );
 }
 
 function NotificationsSection({ settings, setSetting }) {
   const [status, setStatus] = React.useState(null); // 'enabling' | 'denied' | 'unsupported' | null
+  const [testState, setTestState] = React.useState(null); // 'sending' | 'sent' | 'error' | null
   const supported = pushSupported();
   const enabled = settings.notifEnabled === true && notificationPermission() === 'granted';
 
@@ -154,6 +158,12 @@ function NotificationsSection({ settings, setSetting }) {
     else setStatus(r);
   };
   const disable = async () => { await disablePush(); setSetting('notifEnabled', false); setStatus(null); };
+  const test = async () => {
+    setTestState('sending');
+    try { const r = await sendTest(); setTestState(r.sent > 0 ? 'sent' : 'error'); }
+    catch { setTestState('error'); }
+    setTimeout(() => setTestState(null), 4000);
+  };
 
   if (!supported) {
     return (
@@ -183,27 +193,48 @@ function NotificationsSection({ settings, setSetting }) {
 
       {enabled && (
         <>
-          <SettingRow label="Morning intent" hint="Set the day">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              {settings.notifMorning !== false && <HourField value={settings.notifMorningHour ?? 7} onChange={v => change('notifMorningHour', v)} />}
-              <IOSSwitch checked={settings.notifMorning !== false} onChange={v => change('notifMorning', v)} />
-            </div>
-          </SettingRow>
-          <SettingRow label="Evening reflection" hint="Close the loop">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              {settings.notifEvening !== false && <HourField value={settings.notifEveningHour ?? 21} onChange={v => change('notifEveningHour', v)} />}
-              <IOSSwitch checked={settings.notifEvening !== false} onChange={v => change('notifEvening', v)} />
-            </div>
-          </SettingRow>
-          <SettingRow label="Streak nudge" hint="Only if nothing's logged that day" divider={false}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              {settings.notifNudges === true && <HourField value={settings.notifNudgeHour ?? 20} onChange={v => change('notifNudgeHour', v)} />}
-              <IOSSwitch checked={settings.notifNudges === true} onChange={v => change('notifNudges', v)} />
-            </div>
+          <ReminderRow label="Morning intent" hint="Set the day" on={settings.notifMorning !== false}
+            hour={settings.notifMorningHour ?? 7} minute={settings.notifMorningMinute ?? 0}
+            onToggle={v => change('notifMorning', v)} onHour={v => change('notifMorningHour', v)} onMinute={v => change('notifMorningMinute', v)} />
+          <ReminderRow label="Evening reflection" hint="Close the loop" on={settings.notifEvening !== false}
+            hour={settings.notifEveningHour ?? 21} minute={settings.notifEveningMinute ?? 0}
+            onToggle={v => change('notifEvening', v)} onHour={v => change('notifEveningHour', v)} onMinute={v => change('notifEveningMinute', v)} />
+          <ReminderRow label="Streak nudge" hint="Only if nothing's logged that day" on={settings.notifNudges === true}
+            hour={settings.notifNudgeHour ?? 20} minute={settings.notifNudgeMinute ?? 0}
+            onToggle={v => change('notifNudges', v)} onHour={v => change('notifNudgeHour', v)} onMinute={v => change('notifNudgeMinute', v)} />
+          <SettingRow label="Send test notification" hint={
+            testState === 'sent' ? 'Sent — check your lock screen' :
+            testState === 'error' ? "Couldn't send — is the server deployed?" :
+            'Confirm the whole pipeline works'
+          } divider={false} onClick={testState === 'sending' ? undefined : test}>
+            <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: testState === 'sent' ? '#7A8C7E' : testState === 'error' ? '#B8453E' : T.amber }}>
+              {testState === 'sending' ? 'Sending…' : testState === 'sent' ? '✓' : 'Send'}
+            </span>
           </SettingRow>
         </>
       )}
     </SettingsCard>
+  );
+}
+
+// One reminder row: a toggle, and (when on) a minute-precise time picker that
+// wraps under the label on narrow screens.
+function ReminderRow({ label, hint, on, hour, minute, onToggle, onHour, onMinute, divider = true }) {
+  return (
+    <div style={{ padding: '14px 0', borderBottom: divider ? `0.5px solid ${T.border}` : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 500, color: T.ink }}>{label}</div>
+          {hint && <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 2 }}>{hint}</div>}
+        </div>
+        <IOSSwitch checked={on} onChange={onToggle} />
+      </div>
+      {on && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+          <TimeField hour={hour} minute={minute} onHour={onHour} onMinute={onMinute} />
+        </div>
+      )}
+    </div>
   );
 }
 

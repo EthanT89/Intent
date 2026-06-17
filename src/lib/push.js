@@ -70,6 +70,36 @@ export async function syncPushPrefs(prefs) {
   return true;
 }
 
+// Re-register the current subscription + prefs + timezone. Call on app launch so
+// the server self-heals against rotated subscriptions and timezone changes
+// (travel). Silent — never prompts.
+export async function refreshPush(prefs) {
+  if (!pushSupported() || notificationPermission() !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC),
+      });
+    }
+    await postSubscription(sub.toJSON(), prefs);
+    return true;
+  } catch { return false; }
+}
+
+// Fire a one-off test push (confirms the whole pipeline).
+export async function sendTest() {
+  const res = await fetch(`${PUSH_BASE}/test`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  if (!res.ok) throw new Error(`push-test-${res.status}`);
+  return res.json();
+}
+
 export async function disablePush() {
   if (!pushSupported()) return;
   const reg = await navigator.serviceWorker.ready;
@@ -90,9 +120,12 @@ export function prefsFromSettings(s) {
   return {
     morning: s.notifMorning !== false,
     morningHour: s.notifMorningHour ?? 7,
+    morningMinute: s.notifMorningMinute ?? 0,
     evening: s.notifEvening !== false,
     eveningHour: s.notifEveningHour ?? 21,
+    eveningMinute: s.notifEveningMinute ?? 0,
     nudge: s.notifNudges === true,
     nudgeHour: s.notifNudgeHour ?? 20,
+    nudgeMinute: s.notifNudgeMinute ?? 0,
   };
 }

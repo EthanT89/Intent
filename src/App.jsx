@@ -6,6 +6,7 @@ import { useApp } from './store/AppStateContext.jsx';
 import { usePersistentState } from './store/usePersistentState.js';
 import { activeStreak, highestMilestone } from './lib/momentum.js';
 import { StreakCelebration } from './components/StreakCelebration.jsx';
+import { refreshPush, prefsFromSettings } from './lib/push.js';
 import { UIContext } from './store/uiContext.js';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { StatsScreen } from './screens/StatsScreen.jsx';
@@ -139,6 +140,12 @@ export default function App() {
     if (m > milestoneSeen) { setStreakCelebration(m); setMilestoneSeen(m); }
     else if (m < milestoneSeen) { setMilestoneSeen(m); } // streak broke — re-arm
   }, [streak]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Self-heal push on launch: refresh the subscription + current timezone so it
+  // survives rotated subscriptions and travel. Silent; no-op unless enabled.
+  React.useEffect(() => {
+    if (settings.notifEnabled) refreshPush(prefsFromSettings(settings));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Coffee modal state (global — reachable from Today pill, section, detail)
   const [pullModalOpen, setPullModalOpen] = React.useState(false);
