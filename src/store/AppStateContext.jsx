@@ -195,6 +195,7 @@ export function AppStateProvider({ children }) {
       workouts: movement.workouts || [],
       schedule: movement.schedule || { recurring: {}, oneOff: {} },
       sessions: movement.sessions || [],
+      weights: movement.weights || {},
     };
     const patchMovement = (patch) => setMovement(prev => ({ ...mv, ...prev, ...patch }));
 
@@ -246,6 +247,15 @@ export function AppStateProvider({ children }) {
     const deleteSession = (id) => setMovement(prev => ({
       ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
     }));
+
+    // Bodyweight: one entry per day. A falsy/zero value clears that day's entry.
+    const logWeight = (value, dayKey = today) => setMovement(prev => {
+      const weights = { ...(prev.weights || {}) };
+      const v = Number(value);
+      if (!v || v <= 0) delete weights[dayKey];
+      else weights[dayKey] = v;
+      return { ...prev, weights };
+    });
 
     // Reflection (daily intent + evening) ------------------------------------
     const refl = { days: reflection.days || {} };
@@ -301,7 +311,7 @@ export function AppStateProvider({ children }) {
       routines, setRoutineList, setRoutineHistory, toggleRoutineItem,
       movement: mv,
       saveExercise, deleteExercise, saveWorkout, deleteWorkout,
-      scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession,
+      scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
       reflection: refl, setDayIntent, setDayEvening,
       deepwork: dw, startSession, endSession,
       firstUse,

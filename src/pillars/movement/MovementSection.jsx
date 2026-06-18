@@ -8,6 +8,7 @@ import { ExerciseEditor } from './ExerciseEditor.jsx';
 import { WorkoutBuilder } from './WorkoutBuilder.jsx';
 import { WorkoutLogger } from './WorkoutLogger.jsx';
 import { WeeklySchedule } from './WeeklySchedule.jsx';
+import { WeightCard } from './WeightCard.jsx';
 import { timeAgo } from '../../lib/dates.js';
 
 export function MovementSection({ onBack }) {
@@ -43,6 +44,9 @@ export function MovementSection({ onBack }) {
       {/* ── TODAY ───────────────────────────────────────────────────────── */}
       {view === 'today' && (
         <>
+          {/* Daily bodyweight — quick log + trend */}
+          <WeightCard />
+
           <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             Today's plan
           </div>

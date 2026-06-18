@@ -6,6 +6,7 @@
 //   schedule:  { recurring: { '0'..'6': [workoutId] }, oneOff: { 'YYYY-MM-DD': [workoutId] } }
 //   sessions:  [{ id, date, at, workoutId, name, durationMin, notes,
 //                 entries: [{ exerciseId, name, kind, sets:[{reps,weight}], duration, distance, done }] }]
+//   weights:   { 'YYYY-MM-DD': number }   // daily bodyweight log, one entry per day
 
 import { dateKey, isThisMonth, weekStart, addDays } from '../../lib/dates.js';
 
@@ -14,6 +15,7 @@ export const MOVEMENT_SEED = {
   workouts: [],
   schedule: { recurring: {}, oneOff: {} },
   sessions: [],
+  weights: {},
 };
 
 // Each exercise kind declares which metric fields it uses. This drives both the
@@ -86,3 +88,22 @@ export function computeMovementStats(movement) {
 
 export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const DAY_SHORT = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// ── Bodyweight ──────────────────────────────────────────────────────────────
+// The weights map → a clean list of { date, weight }, oldest first, valid only.
+export function weightEntries(movement) {
+  const w = (movement && movement.weights) || {};
+  return Object.entries(w)
+    .map(([date, weight]) => ({ date, weight: Number(weight) }))
+    .filter(e => e.weight > 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+// Latest entry, the one before it, and the change between them (for the trend).
+export function weightSummary(movement) {
+  const entries = weightEntries(movement);
+  const latest = entries[entries.length - 1] || null;
+  const previous = entries[entries.length - 2] || null;
+  const delta = latest && previous ? +(latest.weight - previous.weight).toFixed(1) : null;
+  return { entries, latest, previous, delta };
+}
