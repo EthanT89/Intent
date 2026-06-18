@@ -337,10 +337,11 @@ function LibioShelfPickerModal({ book, onSelect, onDismiss }) {
 }
 
 // ─── Home Screen ──────────────────────────────────────────────────────────────
-function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, onAddBook, userName }) {
+function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, onAddBook, onPassages, userName }) {
   const currentBook = books.reading[0];
   const otherCurrent = books.reading.slice(1);
   const hasAnyBooks = ['reading','read','wantToRead','paused'].some(s => (books[s] || []).length > 0);
+  const passageCount = gatherPassages(books).total;
   // Live figures for the streak + yearly-goal pills.
   const { settings: appSettings } = useApp();
   const a = computeReadingAnalytics(books);
@@ -469,6 +470,23 @@ function LibioHomeScreen({ books, stats, onBookTap, onLogSession, onDiscovery, o
           <LibioProgressBar pct={(a.booksThisYear / goalTotal) * 100} height={3} />
         </div>
       </div>
+
+      {/* Passages — quick way back to the lines you've kept */}
+      {passageCount > 0 && (
+        <button onClick={onPassages} style={{
+          display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
+          background: '#FFF8F0', border: '0.5px solid #EAE0D4', borderRadius: 16,
+          padding: '14px 16px', marginBottom: 16, cursor: 'pointer',
+          fontFamily: "'DM Sans', sans-serif",
+        }}>
+          <span style={{ fontFamily: "'Lora', serif", fontSize: 30, color: '#C4956A', lineHeight: 0.7, marginTop: 6 }}>“</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "'Lora', serif", fontSize: 15, fontWeight: 600, color: '#2C2418' }}>Passages</p>
+            <p style={{ fontSize: 12, color: '#A89880' }}>{passageCount} {passageCount === 1 ? 'quote' : 'quotes'} you've kept</p>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 2l5 5-5 5" stroke="#A89880" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
+      )}
 
       {/* What's Next — only once there's something in the library */}
       {hasAnyBooks && (
@@ -1266,10 +1284,85 @@ function LibioAddBookScreen({ onBack, onAddToShelf, active }) {
 }
 
 // ─── LibioApp root — the full embedded app ────────────────────────────────────
+// ─── Passages Screen — every saved quote, gathered in one quiet place ───────────
+// Quotes are saved per-book in the detail view; this surfaces them all together so
+// the lines worth keeping resurface instead of staying buried inside each book.
+export function gatherPassages(books) {
+  const groups = [];
+  // Currently-reading first, then finished, then paused/want-to-read.
+  for (const shelf of ['reading', 'read', 'paused', 'wantToRead']) {
+    for (const b of (books[shelf] || [])) {
+      if (Array.isArray(b.quotes) && b.quotes.length) groups.push({ book: b, quotes: b.quotes });
+    }
+  }
+  const total = groups.reduce((n, g) => n + g.quotes.length, 0);
+  return { groups, total };
+}
+
+function LibioPassagesScreen({ books, onBack, onBookTap }) {
+  const { groups, total } = gatherPassages(books);
+
+  return (
+    <div className="intent-scroll" style={{ height: '100%', overflowY: 'auto', overflowX: 'hidden', padding: `${SAFE_TOP_PAD} 20px 100px`, fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2' }}>
+      <button onClick={onBack} style={{
+        background: 'none', border: 'none', padding: 0,
+        display: 'flex', alignItems: 'center', gap: 6,
+        color: '#A89880', fontSize: 13, cursor: 'pointer',
+        marginBottom: 20, fontFamily: "'DM Sans', sans-serif",
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M15 18l-6-6 6-6" stroke="#A89880" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Back
+      </button>
+      <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 600, color: '#2C2418', marginBottom: 4 }}>Passages</h1>
+      <p style={{ fontSize: 13, color: '#A89880', marginBottom: 24 }}>
+        {total === 0 ? 'Lines worth keeping' : `${total} ${total === 1 ? 'quote' : 'quotes'} from ${groups.length} ${groups.length === 1 ? 'book' : 'books'}`}
+      </p>
+
+      {total === 0 ? (
+        <LibioSearchHint icon="empty" title="No passages yet"
+          body="Open a book and tap “Add quote” to keep the lines that stay with you. They’ll all gather here." />
+      ) : (
+        groups.map(({ book, quotes }) => (
+          <div key={book.id} style={{ marginBottom: 26 }}>
+            {/* Source book — tappable to jump to its detail */}
+            <button onClick={() => onBookTap(book)} style={{
+              display: 'flex', gap: 10, alignItems: 'center', width: '100%',
+              background: 'none', border: 'none', padding: '0 2px 10px', cursor: 'pointer', textAlign: 'left',
+            }}>
+              <LibioBookCover color={book.color} cover={book.cover} title={book.title} width={26} height={38} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontFamily: "'Lora', serif", fontSize: 14, fontWeight: 600, color: '#2C2418', lineHeight: 1.25,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</p>
+                <p style={{ fontSize: 11, color: '#A89880' }}>{book.author}</p>
+              </div>
+            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {quotes.map((q, i) => (
+                <div key={i} style={{
+                  background: '#FFF8F0', border: '0.5px solid #EAE0D4', borderRadius: 16,
+                  padding: '16px 18px', position: 'relative',
+                }}>
+                  <span aria-hidden style={{ position: 'absolute', top: 2, left: 12, fontFamily: "'Lora', serif", fontSize: 40, color: '#EAD9C4', lineHeight: 1 }}>“</span>
+                  <p style={{ fontFamily: "'Lora', serif", fontStyle: 'italic', fontSize: 15, color: '#2C2418', lineHeight: 1.6, position: 'relative', paddingLeft: 14 }}>{q.text}</p>
+                  {q.page != null && q.page !== '' && (
+                    <p style={{ fontSize: 11, color: '#A89880', marginTop: 8, paddingLeft: 14 }}>p. {q.page}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 export function LibioApp({ initialTab, onLogSessionExternal }) {
   const { books, setBooks, settings, finishBook, setBookFinishedDate } = useApp();
   const [tab, setTab] = React.useState(initialTab || 'home');
-  const [screen, setScreen] = React.useState('main'); // main | bookDetail | discovery | addBook
+  const [screen, setScreen] = React.useState('main'); // main | bookDetail | discovery | addBook | passages
   const [selectedBook, setSelectedBook] = React.useState(null);
   const [logSessionBook, setLogSessionBook] = React.useState(null);
 
@@ -1408,7 +1501,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
 
       {/* Main screens */}
       <div style={{ ...slideStyle, transform: screen === 'main' ? 'translateX(0)' : 'translateX(-100%)', opacity: screen === 'main' ? 1 : 0, pointerEvents: screen === 'main' ? 'auto' : 'none' }}>
-        {tab === 'home' && <LibioHomeScreen books={books} stats={LIBIO_STATS_DATA} onBookTap={handleBookTap} onLogSession={handleLogSession} onDiscovery={() => setScreen('discovery')} onAddBook={() => setScreen('addBook')} userName={settings.userName} />}
+        {tab === 'home' && <LibioHomeScreen books={books} stats={LIBIO_STATS_DATA} onBookTap={handleBookTap} onLogSession={handleLogSession} onDiscovery={() => setScreen('discovery')} onAddBook={() => setScreen('addBook')} onPassages={() => setScreen('passages')} userName={settings.userName} />}
         {tab === 'library' && <LibioLibraryScreen books={books} onBookTap={handleBookTap} onAddBook={() => setScreen('addBook')} />}
         {tab === 'stats' && <LibioStatsScreen stats={LIBIO_STATS_DATA} />}
 
@@ -1461,6 +1554,15 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
       {/* Add Book */}
       <div style={{ ...slideStyle, transform: screen === 'addBook' ? 'translateX(0)' : 'translateX(100%)', opacity: screen === 'addBook' ? 1 : 0, pointerEvents: screen === 'addBook' ? 'auto' : 'none' }}>
         <LibioAddBookScreen active={screen === 'addBook'} onBack={() => setScreen('main')} onAddToShelf={handleAddToShelf} />
+      </div>
+
+      {/* Passages — every saved quote in one place */}
+      <div style={{ ...slideStyle, transform: screen === 'passages' ? 'translateX(0)' : 'translateX(100%)', opacity: screen === 'passages' ? 1 : 0, pointerEvents: screen === 'passages' ? 'auto' : 'none' }}>
+        <LibioPassagesScreen
+          books={books}
+          onBack={() => setScreen('main')}
+          onBookTap={(b) => { setSelectedBook(b); setScreen('bookDetail'); }}
+        />
       </div>
 
       {/* Log Session Sheet */}
