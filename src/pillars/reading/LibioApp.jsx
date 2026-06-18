@@ -614,7 +614,7 @@ function LibioLibraryScreen({ books, onBookTap, onAddBook }) {
 }
 
 // ─── Book Detail Screen ───────────────────────────────────────────────────────
-function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook, onMoveToShelf, onFinishBook, onSetFinishedDate }) {
+function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, sessions, onBack, onLogSession, onDiscovery, onUpdateBook, onMakePrimary, onPauseBook, onResumeBook, onMoveToShelf, onFinishBook, onSetFinishedDate }) {
   const [rating, setRating] = React.useState(book.rating || 0);
   const [quotes, setQuotes] = React.useState(book.quotes || []);
   const [editingDate, setEditingDate] = React.useState(false);
@@ -636,13 +636,20 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
     onUpdateBook && onUpdateBook({ ...book, quotes: updated });
   };
 
+  // Estimate finish from your actual pace: pages logged for this book ÷ distinct
+  // days read → pages/day → days for the pages remaining.
   const estimatedFinish = () => {
-    if (book.daysLeft) {
-      const d = new Date(); d.setDate(d.getDate() + book.daysLeft);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-    return '—';
+    const mine = (sessions || []).filter(s => s.bookId === book.id && (s.pages || 0) > 0);
+    const remaining = (book.totalPages || 0) - (book.currentPage || 0);
+    if (mine.length === 0 || remaining <= 0) return null;
+    const days = new Set(mine.map(s => s.date)).size || 1;
+    const perDay = mine.reduce((a, s) => a + s.pages, 0) / days;
+    if (perDay <= 0) return null;
+    const daysLeft = Math.max(1, Math.ceil(remaining / perDay));
+    const d = new Date(); d.setDate(d.getDate() + daysLeft);
+    return { daysLeft, perDay: Math.round(perDay), date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) };
   };
+  const eta = estimatedFinish();
 
   const primaryBtn = {
     width: '100%', padding: '14px', background: '#2C2418', color: '#FAF7F2',
@@ -705,7 +712,9 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, onBack, on
               <LibioProgressBar pct={book.progress} height={6} />
               {book.progress >= 100
                 ? <p style={{ fontSize: 12, color: '#7A8C7E', marginTop: 8, fontWeight: 600 }}>You've reached the last page — mark it finished below.</p>
-                : <p style={{ fontSize: 12, color: '#A89880', marginTop: 8 }}>Est. finish: {estimatedFinish()}</p>}
+                : eta
+                  ? <p style={{ fontSize: 12, color: '#A89880', marginTop: 8 }}>At ~{eta.perDay} pages/day, done around <span style={{ color: '#2C2418', fontWeight: 600 }}>{eta.date}</span> ({eta.daysLeft} {eta.daysLeft === 1 ? 'day' : 'days'})</p>
+                  : <p style={{ fontSize: 12, color: '#A89880', marginTop: 8 }}>Log a session to see your pace.</p>}
             </div>
           )}
           {shelf === 'read' && (
@@ -1424,6 +1433,7 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
               shelf={detailShelf}
               isPrimary={isPrimary}
               hasSiblings={hasSiblings}
+              sessions={books.sessions}
               onBack={() => setScreen('main')}
               onLogSession={handleLogSession}
               onDiscovery={() => setScreen('discovery')}
