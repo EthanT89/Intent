@@ -137,3 +137,51 @@ export async function searchBooks(query, { signal, limit = 20 } = {}) {
   cacheSet(cacheKey, results);
   return results;
 }
+
+/**
+ * Suggest what to read next, from the live catalog, based on the user's library:
+ * more from authors they've read (weighted by rating) and more in their top genre.
+ * Excludes books already on any shelf. Returns [] if there's nothing to seed from.
+ * @param {object} books  the books slice { reading, read, wantToRead, paused }
+ * @param {object} opts   { signal?: AbortSignal, limit?: number }
+ */
+export async function recommendBooks(books, { signal, limit = 8 } = {}) {
+  const owned = new Set();
+  const ownedKeys = new Set();
+  const key = (b) => `${(b.title || '').toLowerCase()}|${(b.author || '').toLowerCase()}`;
+  for (const shelf of ['reading', 'read', 'wantToRead', 'paused']) {
+    for (const b of (books[shelf] || [])) { owned.add(b.id); ownedKeys.add(key(b)); }
+  }
+
+  const lib = [...(books.read || []), ...(books.reading || [])];
+  // Top authors, weighted by how many you've read + your rating.
+  const authorScore = {};
+  lib.forEach(b => {
+    if (b.author && b.author !== 'Unknown author') authorScore[b.author] = (authorScore[b.author] || 0) + 1 + (b.rating || 0);
+  });
+  const topAuthors = Object.entries(authorScore).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+  // Top genre.
+  const genreScore = {};
+  lib.forEach(b => { if (b.genre && b.genre !== 'General') genreScore[b.genre] = (genreScore[b.genre] || 0) + 1; });
+  const topGenre = Object.entries(genreScore).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const queries = [];
+  topAuthors.forEach(a => queries.push({ q: `author:"${a}"`, reason: `More from ${a}` }));
+  if (topGenre) queries.push({ q: `subject:"${topGenre.toLowerCase()}"`, reason: `Because you read ${topGenre.toLowerCase()}` });
+  if (queries.length === 0) return [];
+
+  const out = [];
+  const seen = new Set();
+  for (const { q, reason } of queries) {
+    let docs = [];
+    try { docs = await searchBooks(q, { signal, limit: 12 }); } catch { continue; }
+    for (const b of docs) {
+      const k = key(b);
+      if (!b.title || owned.has(b.id) || ownedKeys.has(k) || seen.has(k)) continue;
+      seen.add(k);
+      out.push({ ...b, reason });
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
+}

@@ -2,9 +2,9 @@ import React from 'react';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { greetingForNow, isThisYear, weekStart, dateKey, addDays } from '../../lib/dates.js';
 import {
-  LIBIO_STATS_DATA, LIBIO_DISCOVERY_DATA,
+  LIBIO_STATS_DATA,
 } from './data.js';
-import { searchBooks } from './bookSearch.js';
+import { searchBooks, recommendBooks } from './bookSearch.js';
 import { BookCover } from './BookCover.jsx';
 
 // Full Libio app embedded as the Reading pillar — ported 1:1 from the design
@@ -1015,8 +1015,23 @@ export function LibioStatsScreen() {
 }
 
 // ─── Discovery Screen ─────────────────────────────────────────────────────────
-function LibioDiscoveryScreen({ onBack }) {
+function LibioDiscoveryScreen({ onBack, books, onAdd }) {
+  const [recs, setRecs] = React.useState([]);
+  const [status, setStatus] = React.useState('loading'); // loading | ok | empty | error
   const [added, setAdded] = React.useState({});
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    setStatus('loading');
+    recommendBooks(books, { signal: controller.signal })
+      .then(r => { if (!cancelled) { setRecs(r); setStatus(r.length ? 'ok' : 'empty'); } })
+      .catch(() => { if (!cancelled) setStatus('error'); });
+    return () => { cancelled = true; controller.abort(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hasLibrary = ['reading', 'read', 'wantToRead', 'paused'].some(s => (books[s] || []).length > 0);
+
   return (
     <div className="intent-scroll" style={{ height: '100%', overflowY: 'auto', padding: `${SAFE_TOP_PAD} 20px 100px`, fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2' }}>
       <button onClick={onBack} style={{
@@ -1031,18 +1046,32 @@ function LibioDiscoveryScreen({ onBack }) {
         Back
       </button>
       <h1 style={{ fontFamily: "'Lora', serif", fontSize: 26, fontWeight: 600, color: '#2C2418', marginBottom: 4 }}>What's next?</h1>
-      <p style={{ fontSize: 13, color: '#A89880', marginBottom: 24 }}>Based on your library</p>
-      {LIBIO_DISCOVERY_DATA.map((book) => (
+      <p style={{ fontSize: 13, color: '#A89880', marginBottom: 24 }}>From authors and themes you love</p>
+
+      {status === 'loading' && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 50, gap: 14 }}>
+          <div className="libio-spinner" style={{ width: 26, height: 26, borderRadius: '50%', border: '2.5px solid #EAE0D4', borderTopColor: '#C4956A' }} />
+          <p style={{ fontSize: 13, color: '#A89880' }}>Finding your next read…</p>
+        </div>
+      )}
+      {status === 'error' && <LibioSearchHint icon="warn" title="Couldn't load suggestions" body="Check your connection and try again." />}
+      {status === 'empty' && (
+        <LibioSearchHint icon="empty"
+          title={hasLibrary ? 'No fresh picks right now' : 'Read a book or two first'}
+          body={hasLibrary ? 'Finish or rate a few books and suggestions will sharpen.' : 'Once your shelves have a few books, suggestions appear here.'} />
+      )}
+
+      {status === 'ok' && recs.map((book) => (
         <div key={book.id} style={{ background: '#FFFFFF', border: '0.5px solid #EAE0D4', borderRadius: 18, padding: 16, marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 14 }}>
-            <LibioBookCover color={book.color} width={52} height={76} />
+            <LibioBookCover color={book.color} cover={book.cover} title={book.title} width={52} height={76} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <h3 style={{ fontFamily: "'Lora', serif", fontSize: 15, fontWeight: 600, color: '#2C2418', marginBottom: 3, lineHeight: 1.3 }}>{book.title}</h3>
               <p style={{ fontSize: 12, color: '#A89880', marginBottom: 8 }}>{book.author}</p>
               <p style={{ fontSize: 12, color: '#8B6B4A', lineHeight: 1.5 }}>{book.reason}</p>
             </div>
           </div>
-          <button onClick={() => setAdded(prev => ({ ...prev, [book.id]: true }))} style={{
+          <button onClick={() => { if (!added[book.id]) { onAdd(book); setAdded(prev => ({ ...prev, [book.id]: true })); } }} style={{
             padding: '10px 16px',
             background: added[book.id] ? '#F0EAE0' : 'transparent',
             color: added[book.id] ? '#A89880' : '#2C2418',
@@ -1050,7 +1079,7 @@ function LibioDiscoveryScreen({ onBack }) {
             borderRadius: 10, fontFamily: "'DM Sans', sans-serif",
             fontSize: 13, fontWeight: 600,
             cursor: added[book.id] ? 'default' : 'pointer', transition: 'all 0.2s',
-          }}>{added[book.id] ? '✓ Added' : '+ Add to library'}</button>
+          }}>{added[book.id] ? '✓ Added to Want to Read' : '+ Add to Want to Read'}</button>
         </div>
       ))}
     </div>
@@ -1412,7 +1441,11 @@ export function LibioApp({ initialTab, onLogSessionExternal }) {
 
       {/* Discovery */}
       <div style={{ ...slideStyle, transform: screen === 'discovery' ? 'translateX(0)' : 'translateX(100%)', opacity: screen === 'discovery' ? 1 : 0, pointerEvents: screen === 'discovery' ? 'auto' : 'none' }}>
-        <LibioDiscoveryScreen onBack={() => setScreen(selectedBook ? 'bookDetail' : 'main')} />
+        <LibioDiscoveryScreen
+          books={books}
+          onAdd={(b) => handleAddToShelf(b, 'wantToRead')}
+          onBack={() => setScreen(selectedBook ? 'bookDetail' : 'main')}
+        />
       </div>
 
       {/* Add Book */}
