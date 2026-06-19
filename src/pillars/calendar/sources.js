@@ -106,13 +106,44 @@ function routineAdapter(app, start, end) {
   return out;
 }
 
+// ── Subscribed external calendars (read-only: Google / Apple / any .ics) ─────
+// Reads the per-device cache populated by lib/icsSync.js. Each subscription has
+// its own enable flag + color; items are never editable here.
+function subscriptionsAdapter(app, start, end) {
+  const subs = (app.calendar?.settings?.subscriptions) || [];
+  const cache = app.calCache || {};
+  const out = [];
+  for (const sub of subs) {
+    if (sub.enabled === false) continue;
+    const cached = cache[sub.id];
+    if (!cached || !Array.isArray(cached.events)) continue;
+    for (const ev of cached.events) {
+      for (const occ of expandEvent(ev, start, end)) {
+        out.push({
+          id: `${ev.id}#${dateKey(occ.start)}`,
+          sourceId: 'subscriptions', kind: 'sub',
+          title: ev.title || 'Untitled',
+          date: dateKey(occ.start),
+          allDay: !!ev.allDay,
+          start: ev.allDay ? null : occ.start,
+          end: ev.allDay ? null : occ.end,
+          color: sub.color || '#5C6B6B',
+          editable: false, ref: { type: 'sub', sub: sub.name }, notes: ev.notes, location: ev.location,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // The registry. `always: true` sources can't be toggled off.
 export const CAL_SOURCES = [
   { id: 'events', label: 'Events', color: DEFAULT_EVENT_COLOR, adapter: eventsAdapter, always: true },
   { id: 'tasks', label: 'Tasks', color: TASK_COLOR, adapter: tasksAdapter },
   { id: 'movement', label: 'Workouts', color: PILLAR_COLORS.movement, adapter: movementAdapter },
   { id: 'routine', label: 'Routines', color: PILLAR_COLORS.routine, adapter: routineAdapter },
-  // Future: { id: 'reading', ... }, { id: 'macros', ... }, { id: 'google', ... }
+  { id: 'subscriptions', label: 'Subscribed calendars', color: '#5C6B6B', adapter: subscriptionsAdapter },
+  // Future: { id: 'reading', ... }, { id: 'macros', ... }
 ];
 
 export function sourceVisible(app, id) {

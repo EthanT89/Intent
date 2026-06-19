@@ -10,6 +10,8 @@ import {
 } from '../pillars/calendar/model.js';
 import { itemsForRange, itemsForDate, inboxTasks, CAL_SOURCES } from '../pillars/calendar/sources.js';
 import { CalendarComposer } from '../pillars/calendar/CalendarComposer.jsx';
+import { refreshSubscriptions } from '../lib/icsSync.js';
+import { EVENT_COLORS } from '../pillars/calendar/model.js';
 
 const HOUR = 52;   // px per hour in the day grid
 const GUTTER = 46; // left time-label gutter
@@ -28,6 +30,12 @@ export function CalendarScreen() {
   const [composer, setComposer] = React.useState(null);
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const now = new Date();
+
+  // Pull read-only external calendars on open (throttled inside refreshSubscriptions).
+  React.useEffect(() => {
+    const subs = calendar.settings?.subscriptions || [];
+    if (subs.length) refreshSubscriptions(subs, app.calCache, app.setSubCache);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeView = (v) => { setView(v); setCalendarView(v); };
   const shift = (dir) => {
@@ -361,7 +369,7 @@ function Check({ done, color, onClick }) {
 
 function KindTag({ kind }) {
   if (kind === 'event' || kind === 'task') return null;
-  const label = kind === 'workout' ? 'Workout' : kind === 'routine' ? 'Routine' : kind;
+  const label = kind === 'workout' ? 'Workout' : kind === 'routine' ? 'Routine' : kind === 'sub' ? 'Synced' : kind;
   return <span style={{ fontFamily: T.fontSans, fontSize: 9, fontWeight: 600, color: T.muted, background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>{label}</span>;
 }
 
@@ -402,13 +410,93 @@ function OptionsSheet({ app, onClose, setCalendarLayer }) {
           );
         })}
 
+        {/* Subscribed read-only calendars (Google / Apple / any .ics) */}
+        <Subscriptions app={app} />
+
         <button onClick={exportICS} style={{ width: '100%', marginTop: 18, padding: '13px', background: 'none', border: `1px solid ${T.border}`, borderRadius: 12, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>
-          Export events (.ics)
+          Export my events (.ics)
         </button>
-        <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, lineHeight: 1.6, marginTop: 12 }}>
-          Two-way sync with Google &amp; Apple is coming — it runs through your portfolio backend (OAuth), so it'll drop in as another layer here.
-        </div>
       </div>
     </div>
   );
 }
+
+function Subscriptions({ app }) {
+  const subs = (app.calendar?.settings?.subscriptions) || [];
+  const cache = app.calCache || {};
+  const [adding, setAdding] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [url, setUrl] = React.useState('');
+  const [color, setColor] = React.useState('#5C6B6B');
+  const [busy, setBusy] = React.useState(false);
+
+  const add = () => {
+    if (!name.trim() || !url.trim()) return;
+    app.addSubscription({ name: name.trim(), url: url.trim(), color });
+    setName(''); setUrl(''); setAdding(false);
+  };
+  const refresh = async () => {
+    setBusy(true);
+    await refreshSubscriptions(app.calendar?.settings?.subscriptions || [], app.calCache || {}, app.setSubCache, { force: true });
+    setBusy(false);
+  };
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Subscribed calendars · read-only</span>
+        {subs.length > 0 && <button onClick={refresh} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.amber, fontFamily: T.fontSans, fontSize: 12, fontWeight: 600 }}>{busy ? 'Refreshing…' : 'Refresh'}</button>}
+      </div>
+
+      {subs.map(s => {
+        const c = cache[s.id];
+        const status = c?.error ? 'Couldn’t reach feed' : c?.fetchedAt ? `${(c.events || []).length} events` : 'Not fetched yet';
+        return (
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 2px', borderBottom: `0.5px solid ${T.border}` }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: T.fontSans, fontSize: 14, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+              <div style={{ fontFamily: T.fontSans, fontSize: 11, color: c?.error ? '#B8453E' : T.muted }}>{status}</div>
+            </div>
+            <button onClick={() => app.updateSubscription(s.id, { enabled: s.enabled === false })} style={{
+              width: 40, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0,
+              background: s.enabled === false ? T.border : T.amber, position: 'relative',
+            }}>
+              <span style={{ display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transform: `translateX(${s.enabled === false ? 0 : 16}px)`, transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </button>
+            <button onClick={() => app.removeSubscription(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, flexShrink: 0 }}>×</button>
+          </div>
+        );
+      })}
+
+      {adding ? (
+        <div style={{ marginTop: 12 }}>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Name (e.g. Google – Personal)" style={subField} />
+          <input value={url} onChange={e => setUrl(e.target.value)} placeholder="Secret .ics URL" style={{ ...subField, marginTop: 8 }} />
+          <div style={{ display: 'flex', gap: 10, margin: '12px 0' }}>
+            {EVENT_COLORS.map(c => (
+              <button key={c} onClick={() => setColor(c)} style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: color === c ? `2.5px solid ${T.ink}` : '2.5px solid transparent' }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setAdding(false)} style={{ flex: 1, padding: '11px', background: 'none', border: `1px solid ${T.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Cancel</button>
+            <button onClick={add} style={{ flex: 2, padding: '11px', background: T.amber, color: '#FAF7F2', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, opacity: name.trim() && url.trim() ? 1 : 0.45 }}>Add calendar</button>
+          </div>
+          <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, lineHeight: 1.6, marginTop: 10 }}>
+            Google: Settings → your calendar → “Secret address in iCal format”. Apple: Share Calendar → Public Calendar → copy link.
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} style={{ width: '100%', marginTop: 12, padding: '12px', background: 'transparent', border: `1.5px dashed ${T.border}`, borderRadius: 12, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.amber }}>
+          + Subscribe to a calendar
+        </button>
+      )}
+    </div>
+  );
+}
+
+const subField = {
+  width: '100%', boxSizing: 'border-box', padding: '11px 13px',
+  border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.card,
+  fontFamily: T.fontSans, fontSize: 14, color: T.ink, outline: 'none',
+};

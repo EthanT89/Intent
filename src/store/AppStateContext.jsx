@@ -54,6 +54,9 @@ export function AppStateProvider({ children }) {
   const [movement, setMovement] = usePersistentState('intent.movement', MOVEMENT_SEED);
   const [reflection, setReflection] = usePersistentState('intent.reflection', { days: {} });
   const [calendar, setCalendar] = usePersistentState('intent.calendar', CAL_SEED);
+  // Fetched external-calendar events (read-only). Per-device, NOT synced — each
+  // device re-fetches from the source; only the subscription list itself syncs.
+  const [calCache, setCalCache] = usePersistentState('intent.calCache', {});
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -360,6 +363,25 @@ export function AppStateProvider({ children }) {
       ...prev, settings: { ...(prev.settings || {}), defaultView: view },
     }));
 
+    // Subscribed (read-only) external calendars — the list syncs; the fetched
+    // events live in calCache (per-device).
+    const addSubscription = (sub) => setCalendar(prev => {
+      const s = prev.settings || {};
+      return { ...prev, settings: { ...s, subscriptions: [...(s.subscriptions || []), { id: calUid('sub'), enabled: true, ...sub }] } };
+    });
+    const updateSubscription = (id, patch) => setCalendar(prev => {
+      const s = prev.settings || {};
+      return { ...prev, settings: { ...s, subscriptions: (s.subscriptions || []).map(x => x.id === id ? { ...x, ...patch } : x) } };
+    });
+    const removeSubscription = (id) => {
+      setCalendar(prev => {
+        const s = prev.settings || {};
+        return { ...prev, settings: { ...s, subscriptions: (s.subscriptions || []).filter(x => x.id !== id) } };
+      });
+      setCalCache(prev => { const next = { ...prev }; delete next[id]; return next; });
+    };
+    const setSubCache = (id, data) => setCalCache(prev => ({ ...prev, [id]: data }));
+
     // Data -------------------------------------------------------------------
     const exportData = () => {
       const payload = {
@@ -408,13 +430,14 @@ export function AppStateProvider({ children }) {
       scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
       skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence,
       reflection: refl, setDayIntent, setDayEvening,
-      calendar: cal, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
+      calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
+      addSubscription, updateSubscription, removeSubscription, setSubCache,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, importData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, movement, reflection, calendar, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, reflection, calendar, calCache, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
