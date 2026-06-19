@@ -33,6 +33,18 @@ export const RECUR_OPTIONS = [
   { id: 'monthly', label: 'Every month' },
 ];
 
+// Reminder lead times (minutes before the reference moment). For timed items the
+// reference is the start; for all-day items it's 9:00 AM on the day.
+export const REMIND_TIMED = [
+  { v: null, l: 'No reminder' }, { v: 0, l: 'At start time' },
+  { v: 5, l: '5 minutes before' }, { v: 10, l: '10 minutes before' },
+  { v: 15, l: '15 minutes before' }, { v: 30, l: '30 minutes before' },
+  { v: 60, l: '1 hour before' }, { v: 120, l: '2 hours before' }, { v: 1440, l: '1 day before' },
+];
+export const REMIND_ALLDAY = [
+  { v: null, l: 'No reminder' }, { v: 0, l: '9:00 AM that day' }, { v: 1440, l: '9:00 AM the day before' },
+];
+
 export function uid(prefix = 'cal') {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 }

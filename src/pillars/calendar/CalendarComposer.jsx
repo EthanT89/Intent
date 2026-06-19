@@ -2,7 +2,10 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { dateKey } from '../../lib/dates.js';
-import { EVENT_COLORS, DEFAULT_EVENT_COLOR, RECUR_OPTIONS, parseDT, pad2 } from './model.js';
+import { EVENT_COLORS, DEFAULT_EVENT_COLOR, RECUR_OPTIONS, REMIND_TIMED, REMIND_ALLDAY, parseDT, pad2 } from './model.js';
+
+const REMIND_VAL = (s) => (s === 'none' ? null : Number(s));
+const REMIND_STR = (v) => (v == null ? 'none' : String(v));
 
 const field = {
   width: '100%', boxSizing: 'border-box', padding: '11px 13px',
@@ -46,6 +49,7 @@ export function CalendarComposer({ composer, onClose }) {
   const [recur, setRecur] = React.useState(editEvent ? (editEvent.recur || 'none') : 'none');
   const [notes, setNotes] = React.useState(editEvent ? (editEvent.notes || '') : '');
   const [location, setLocation] = React.useState(editEvent ? (editEvent.location || '') : '');
+  const [remind, setRemind] = React.useState(editEvent && editEvent.remind != null ? editEvent.remind : null);
 
   // ── Task draft ──
   const tDue = editTask && editTask.due ? parseDT(editTask.due) : null;
@@ -55,19 +59,20 @@ export function CalendarComposer({ composer, onClose }) {
   const [tDate, setTDate] = React.useState(tDue ? dateKey(tDue) : baseDate);
   const [tTime, setTTime] = React.useState(tDue && editTask.due.length > 10 ? `${pad2(tDue.getHours())}:${pad2(tDue.getMinutes())}` : '09:00');
   const [tNotes, setTNotes] = React.useState(editTask ? (editTask.notes || '') : '');
+  const [tRemind, setTRemind] = React.useState(editTask && editTask.remind != null ? editTask.remind : null);
 
   const saveEv = () => {
     if (!title.trim()) return;
     let start = allDay ? date : `${date}T${startTime}`;
     let end = allDay ? date : `${date}T${endTime}`;
     if (!allDay && parseDT(end) <= parseDT(start)) end = `${date}T${addMinutesToHHMM(startTime, 60)}`;
-    saveEvent({ id: editEvent?.id, title: title.trim(), allDay, start, end, color, recur, notes: notes.trim(), location: location.trim() });
+    saveEvent({ id: editEvent?.id, title: title.trim(), allDay, start, end, color, recur, notes: notes.trim(), location: location.trim(), remind });
     onClose();
   };
   const saveTk = () => {
     if (!tTitle.trim()) return;
     const due = tScheduled ? (tTimed ? `${tDate}T${tTime}` : tDate) : null;
-    saveTask({ id: editTask?.id, title: tTitle.trim(), due, notes: tNotes.trim(), done: editTask?.done });
+    saveTask({ id: editTask?.id, title: tTitle.trim(), due, notes: tNotes.trim(), done: editTask?.done, remind: due ? tRemind : null });
     onClose();
   };
 
@@ -140,6 +145,13 @@ export function CalendarComposer({ composer, onClose }) {
               </select>
             </div>
 
+            <div style={{ marginBottom: 14 }}>
+              <div style={labelStyle}>Reminder</div>
+              <select value={REMIND_STR(remind)} onChange={e => setRemind(REMIND_VAL(e.target.value))} style={{ ...field, appearance: 'none' }}>
+                {(allDay ? REMIND_ALLDAY : REMIND_TIMED).map(o => <option key={REMIND_STR(o.v)} value={REMIND_STR(o.v)}>{o.l}</option>)}
+              </select>
+            </div>
+
             <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Location (optional)" style={{ ...field, marginBottom: 10 }} />
             <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes…" style={{ ...field, height: 64, resize: 'none', marginBottom: 16, lineHeight: 1.5 }} />
 
@@ -169,9 +181,15 @@ export function CalendarComposer({ composer, onClose }) {
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: 14 }}>
                   <span style={{ fontFamily: T.fontSans, fontSize: 14, color: T.ink, fontWeight: 500 }}>Set a time</span>
                   <Toggle on={tTimed} onChange={setTTimed} />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={labelStyle}>Reminder</div>
+                  <select value={REMIND_STR(tRemind)} onChange={e => setTRemind(REMIND_VAL(e.target.value))} style={{ ...field, appearance: 'none' }}>
+                    {(tTimed ? REMIND_TIMED : REMIND_ALLDAY).map(o => <option key={REMIND_STR(o.v)} value={REMIND_STR(o.v)}>{o.l}</option>)}
+                  </select>
                 </div>
               </>
             )}

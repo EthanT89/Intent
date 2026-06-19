@@ -512,6 +512,7 @@ function AgendaView({ app, cursor, now, onItem, onToggle }) {
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, flexShrink: 0 }} />
                     <span style={{ width: 64, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{it.allDay ? 'all-day' : fmtTime(it.start)}</span>
                     <span style={{ flex: 1, fontFamily: T.fontSans, fontSize: 14, color: T.ink, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
+                    {it.ref?.remind != null && <Bell />}
                     <KindTag kind={it.kind} />
                   </button>
                 )
@@ -545,6 +546,14 @@ function Check({ done, color, onClick }) {
     }}>
       {done && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>}
     </button>
+  );
+}
+
+function Bell() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, opacity: 0.7 }}>
+      <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" stroke={T.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
