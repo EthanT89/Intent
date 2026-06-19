@@ -3,6 +3,7 @@ import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
 import { MOVEMENT_SEED, uid } from '../pillars/movement/model.js';
+import { CAL_SEED, uid as calUid } from '../pillars/calendar/model.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useCloudSync } from '../lib/cloudSync.js';
 
@@ -52,6 +53,7 @@ export function AppStateProvider({ children }) {
   const [routines, setRoutines] = usePersistentState('intent.routines', { list: [], history: {} });
   const [movement, setMovement] = usePersistentState('intent.movement', MOVEMENT_SEED);
   const [reflection, setReflection] = usePersistentState('intent.reflection', { days: {} });
+  const [calendar, setCalendar] = usePersistentState('intent.calendar', CAL_SEED);
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -62,7 +64,7 @@ export function AppStateProvider({ children }) {
 
   // ── Cloud sync (optional) ───────────────────────────────────────────────────
   // The full app state as one document. Last-write-wins across devices.
-  const snapshot = { settings, coffee, books, routines, movement, reflection, deepwork, firstUse };
+  const snapshot = { settings, coffee, books, routines, movement, reflection, calendar, deepwork, firstUse };
   const hydrate = React.useCallback((data) => {
     if (!data || typeof data !== 'object') return;
     if (data.settings) setSettings(data.settings);
@@ -71,9 +73,10 @@ export function AppStateProvider({ children }) {
     if (data.routines) setRoutines(data.routines);
     if (data.movement) setMovement(data.movement);
     if (data.reflection) setReflection(data.reflection);
+    if (data.calendar) setCalendar(data.calendar);
     if (data.deepwork) setDeepwork(data.deepwork);
     if (data.firstUse) setFirstUse(data.firstUse);
-  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setReflection, setDeepwork, setFirstUse]);
+  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setReflection, setCalendar, setDeepwork, setFirstUse]);
   const sync = useCloudSync(snapshot, hydrate);
 
   const value = useMemo(() => {
@@ -322,11 +325,46 @@ export function AppStateProvider({ children }) {
     const setDayIntent = (text, dayKey = today) => setDayField('intent', text, dayKey);
     const setDayEvening = (text, dayKey = today) => setDayField('evening', text, dayKey);
 
+    // Calendar (events + tasks + layer/view settings) ------------------------
+    const cal = {
+      events: calendar.events || [],
+      tasks: calendar.tasks || [],
+      settings: { defaultView: 'day', layers: {}, ...(calendar.settings || {}) },
+    };
+    const saveEvent = (ev) => setCalendar(prev => {
+      const list = prev.events || [];
+      if (ev.id && list.some(e => e.id === ev.id)) {
+        return { ...prev, events: list.map(e => e.id === ev.id ? { ...e, ...ev } : e) };
+      }
+      return { ...prev, events: [...list, { ...ev, id: ev.id || calUid('ev'), source: ev.source || 'native' }] };
+    });
+    const deleteEvent = (id) => setCalendar(prev => ({ ...prev, events: (prev.events || []).filter(e => e.id !== id) }));
+
+    const saveTask = (t) => setCalendar(prev => {
+      const list = prev.tasks || [];
+      if (t.id && list.some(x => x.id === t.id)) {
+        return { ...prev, tasks: list.map(x => x.id === t.id ? { ...x, ...t } : x) };
+      }
+      return { ...prev, tasks: [...list, { ...t, id: t.id || calUid('tk'), done: !!t.done }] };
+    });
+    const toggleTask = (id) => setCalendar(prev => ({
+      ...prev, tasks: (prev.tasks || []).map(t => t.id === id ? { ...t, done: !t.done } : t),
+    }));
+    const deleteTask = (id) => setCalendar(prev => ({ ...prev, tasks: (prev.tasks || []).filter(t => t.id !== id) }));
+
+    const setCalendarLayer = (sourceId, visible) => setCalendar(prev => ({
+      ...prev,
+      settings: { ...(prev.settings || {}), layers: { ...((prev.settings || {}).layers || {}), [sourceId]: visible } },
+    }));
+    const setCalendarView = (view) => setCalendar(prev => ({
+      ...prev, settings: { ...(prev.settings || {}), defaultView: view },
+    }));
+
     // Data -------------------------------------------------------------------
     const exportData = () => {
       const payload = {
         exportedAt: new Date().toISOString(),
-        settings, coffee, books, routines, movement, reflection, deepwork,
+        settings, coffee, books, routines, movement, reflection, calendar, deepwork,
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -347,6 +385,7 @@ export function AppStateProvider({ children }) {
       if (payload.routines) { setRoutines(payload.routines); restored.push('routines'); }
       if (payload.movement) { setMovement(payload.movement); restored.push('movement'); }
       if (payload.reflection) { setReflection(payload.reflection); restored.push('reflection'); }
+      if (payload.calendar) { setCalendar(payload.calendar); restored.push('calendar'); }
       if (payload.deepwork) { setDeepwork(payload.deepwork); restored.push('deep work'); }
       if (!restored.length) return { ok: false, error: 'No Intent data found in that file.' };
       return { ok: true, restored };
@@ -369,12 +408,13 @@ export function AppStateProvider({ children }) {
       scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
       skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence,
       reflection: refl, setDayIntent, setDayEvening,
+      calendar: cal, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, importData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, movement, reflection, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, reflection, calendar, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

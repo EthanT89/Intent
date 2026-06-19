@@ -104,8 +104,9 @@ export function PillarPill({ children, onNavigate, cream = false, style = {} }) 
 // ─── Tab bar ─────────────────────────────────────────────────────────────────
 export function TabBar({ active, onChange }) {
   const tabs = [
-    { id: 'today',   label: 'Today',   icon: TabIconToday },
-    { id: 'stats',   label: 'Stats',   icon: TabIconStats },
+    { id: 'today',    label: 'Today',    icon: TabIconToday },
+    { id: 'calendar', label: 'Calendar', icon: TabIconCalendar },
+    { id: 'stats',    label: 'Stats',    icon: TabIconStats },
   ];
   return (
     <div style={{
@@ -113,8 +114,8 @@ export function TabBar({ active, onChange }) {
       left: '50%', transform: 'translateX(-50%)',
       background: 'rgba(255,255,255,0.96)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      borderRadius: 999, padding: '10px 28px',
-      display: 'flex', gap: 36,
+      borderRadius: 999, padding: '10px 26px',
+      display: 'flex', gap: 30,
       boxShadow: '0 4px 24px rgba(44,36,24,0.12), 0 0 0 0.5px rgba(234,224,212,0.8)',
       zIndex: 100,
     }}>
@@ -152,6 +153,16 @@ export function TabIconPhases({ color }) {
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
       <path d="M3 5h16M3 9h12M3 13h14M3 17h10"
         stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+export function TabIconCalendar({ color }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+      <rect x="3" y="4" width="16" height="15" rx="2.5" stroke={color} strokeWidth="1.8"/>
+      <path d="M3 8h16M7 2.5v3M15 2.5v3" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+      <circle cx="8" cy="12.5" r="1.3" fill={color}/>
+      <circle cx="13.5" cy="12.5" r="1.3" fill={color}/>
     </svg>
   );
 }

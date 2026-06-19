@@ -17,6 +17,32 @@ export function addDays(d, n) {
   return out;
 }
 
+export function addMonths(d, n) {
+  const out = new Date(d);
+  out.setMonth(out.getMonth() + n);
+  return out;
+}
+
+export function startOfMonth(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+}
+
+export function endOfMonth(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+export function startOfDay(d = new Date()) {
+  const o = new Date(d); o.setHours(0, 0, 0, 0); return o;
+}
+
+export function endOfDay(d = new Date()) {
+  const o = new Date(d); o.setHours(23, 59, 59, 999); return o;
+}
+
+export function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 export function isToday(iso) {
   if (!iso) return false;
   return dateKey(new Date(iso)) === todayKey();

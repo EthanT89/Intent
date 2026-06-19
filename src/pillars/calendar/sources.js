@@ -1,0 +1,143 @@
+// Calendar source registry — the expansion seam.
+//
+// A "source" turns some slice of app state into normalized calendar items for a
+// date range. The calendar UI only ever talks to itemsForRange/itemsForDate, so
+// adding a new layer (macros, habits, anything) means writing one adapter and
+// appending it to CAL_SOURCES — no UI changes required.
+//
+// Normalized item shape:
+//   { id, sourceId, kind, title, date('YYYY-MM-DD'),
+//     allDay, start: Date|null, end: Date|null,
+//     color, editable, done?, ref, notes?, location? }
+
+import { dateKey, addDays, startOfDay, endOfDay } from '../../lib/dates.js';
+import { PILLAR_COLORS } from '../../theme/tokens.js';
+import { scheduledFor } from '../movement/model.js';
+import { isActiveDay } from '../routine/model.js';
+import { expandEvent, parseDT, DEFAULT_EVENT_COLOR, TASK_COLOR } from './model.js';
+
+function eachDay(start, end, fn) {
+  for (let d = startOfDay(start); d <= end; d = addDays(d, 1)) fn(new Date(d));
+}
+
+// ── Native events ─────────────────────────────────────────────────────────────
+function eventsAdapter(app, start, end) {
+  const out = [];
+  for (const ev of (app.calendar?.events || [])) {
+    for (const occ of expandEvent(ev, start, end)) {
+      out.push({
+        id: `${ev.id}#${dateKey(occ.start)}`,
+        sourceId: 'events', kind: 'event',
+        title: ev.title || 'Untitled',
+        date: dateKey(occ.start),
+        allDay: !!ev.allDay,
+        start: ev.allDay ? null : occ.start,
+        end: ev.allDay ? null : occ.end,
+        color: ev.color || DEFAULT_EVENT_COLOR,
+        editable: true, ref: ev, notes: ev.notes, location: ev.location,
+      });
+    }
+  }
+  return out;
+}
+
+// ── Tasks (with a due date) ─────────────────────────────────────────────────
+function tasksAdapter(app, start, end) {
+  const out = [];
+  for (const t of (app.calendar?.tasks || [])) {
+    if (!t.due) continue; // undated tasks live in the inbox, not on the grid
+    const d = parseDT(t.due);
+    if (d < startOfDay(start) || d > endOfDay(end)) continue;
+    const timed = t.due.length > 10;
+    out.push({
+      id: t.id, sourceId: 'tasks', kind: 'task',
+      title: t.title, date: dateKey(d),
+      allDay: !timed, start: timed ? d : null, end: timed ? d : null,
+      color: t.color || TASK_COLOR, editable: true, done: !!t.done, ref: t,
+    });
+  }
+  return out;
+}
+
+// ── Scheduled workouts (from the Movement planner) ──────────────────────────
+function movementAdapter(app, start, end) {
+  const mv = app.movement || {};
+  const sched = mv.schedule || {};
+  const wkById = Object.fromEntries((mv.workouts || []).map(w => [w.id, w]));
+  const out = [];
+  eachDay(start, end, (d) => {
+    for (const id of scheduledFor(sched, d)) {
+      const w = wkById[id]; if (!w) continue;
+      out.push({
+        id: `wk-${id}-${dateKey(d)}`, sourceId: 'movement', kind: 'workout',
+        title: w.name, date: dateKey(d), allDay: true, start: null, end: null,
+        color: PILLAR_COLORS.movement, editable: false,
+        ref: { type: 'workout', id, count: (w.items || []).length },
+      });
+    }
+  });
+  return out;
+}
+
+// ── Routines (placed in their time-of-day window) ───────────────────────────
+function routineAdapter(app, start, end) {
+  const list = (app.routines && app.routines.list) || [];
+  const out = [];
+  eachDay(start, end, (d) => {
+    for (const r of list) {
+      if (r.disabled || !isActiveDay(r, d)) continue;
+      const w = r.window;
+      let s = null, e = null, allDay = true;
+      if (w) {
+        s = new Date(d); s.setHours(Math.floor(w.start), Math.round((w.start % 1) * 60), 0, 0);
+        e = new Date(d);
+        if (w.end >= 24) e.setHours(23, 59, 0, 0);
+        else e.setHours(Math.floor(w.end), Math.round((w.end % 1) * 60), 0, 0);
+        allDay = false;
+      }
+      out.push({
+        id: `rt-${r.id}-${dateKey(d)}`, sourceId: 'routine', kind: 'routine',
+        title: r.name, date: dateKey(d), allDay, start: s, end: e,
+        color: PILLAR_COLORS.routine, editable: false,
+        ref: { type: 'routine', id: r.id, count: (r.items || []).length },
+      });
+    }
+  });
+  return out;
+}
+
+// The registry. `always: true` sources can't be toggled off.
+export const CAL_SOURCES = [
+  { id: 'events', label: 'Events', color: DEFAULT_EVENT_COLOR, adapter: eventsAdapter, always: true },
+  { id: 'tasks', label: 'Tasks', color: TASK_COLOR, adapter: tasksAdapter },
+  { id: 'movement', label: 'Workouts', color: PILLAR_COLORS.movement, adapter: movementAdapter },
+  { id: 'routine', label: 'Routines', color: PILLAR_COLORS.routine, adapter: routineAdapter },
+  // Future: { id: 'reading', ... }, { id: 'macros', ... }, { id: 'google', ... }
+];
+
+export function sourceVisible(app, id) {
+  const layers = (app.calendar?.settings?.layers) || {};
+  return layers[id] !== false;
+}
+
+// All items intersecting [startDate, endDate], respecting layer visibility.
+export function itemsForRange(app, startDate, endDate) {
+  const start = startOfDay(startDate);
+  const end = endOfDay(endDate);
+  const out = [];
+  for (const s of CAL_SOURCES) {
+    if (!sourceVisible(app, s.id)) continue;
+    try { out.push(...s.adapter(app, start, end)); } catch { /* a bad adapter shouldn't break the calendar */ }
+  }
+  return out;
+}
+
+export function itemsForDate(app, date) {
+  const k = dateKey(date);
+  return itemsForRange(app, date, date).filter(it => it.date === k);
+}
+
+// Undated tasks (the inbox) — not tied to any day.
+export function inboxTasks(app) {
+  return (app.calendar?.tasks || []).filter(t => !t.due);
+}

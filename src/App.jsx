@@ -10,6 +10,7 @@ import { refreshPush, prefsFromSettings } from './lib/push.js';
 import { UIContext } from './store/uiContext.js';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { StatsScreen } from './screens/StatsScreen.jsx';
+import { CalendarScreen } from './screens/CalendarScreen.jsx';
 import { SettingsScreen, SettingsSheet } from './screens/SettingsScreen.jsx';
 import { LogPullModal, RecipeDetailModal, AddRecipeModal } from './pillars/coffee/components.jsx';
 import { LibioApp, LibioStatsScreen, LibioLogSessionSheet } from './pillars/reading/LibioApp.jsx';
@@ -201,6 +202,7 @@ export default function App() {
   const showingLibio = tab === 'library' && !pillarPage && !statsDrill;
   const showingLibioStats = statsDrill === 'reading';
   const showingSettingsPage = settingsOpen && settings.settingsPresentation !== 'sheet';
+  const showingCalendar = tab === 'calendar' && !pillarPage && !statsDrill && !showingSettingsPage;
 
   // ── Screen resolver ─────────────────────────────────────────────────────────
   let screen = null;
@@ -258,8 +260,8 @@ export default function App() {
   const basePad = 'calc(var(--safe-top) + 12px)';
   const titleBarPad = 'calc(var(--safe-top) + 70px)';
   const paddingTop = showTitleBar && !pillarPage && !statsDrill ? titleBarPad : basePad;
-  // Libio and the embedded Libio stats manage their own scroll
-  const wrapInScroll = !showingLibio && !showingLibioStats;
+  // Libio, the embedded Libio stats, and the Calendar manage their own scroll
+  const wrapInScroll = !showingLibio && !showingLibioStats && !showingCalendar;
 
   return (
     <UIContext.Provider value={ui}>
@@ -302,8 +304,15 @@ export default function App() {
           </div>
         )}
 
+        {/* Calendar — full-height, manages its own scroll + sticky header */}
+        {showingCalendar && (
+          <div style={{ position: 'absolute', inset: 0, paddingTop: 'calc(var(--safe-top) + 8px)' }}>
+            <CalendarScreen />
+          </div>
+        )}
+
         {/* Normal Intent screens */}
-        {wrapInScroll && !showingLibio && (
+        {wrapInScroll && screen && !showingLibio && (
           <div ref={scrollRef} className="intent-scroll"
             style={{
               position: 'absolute', inset: 0,
