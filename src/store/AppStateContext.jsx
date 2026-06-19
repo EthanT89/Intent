@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
-import { MOVEMENT_SEED, uid } from '../pillars/movement/model.js';
+import { MOVEMENT_SEED, uid, ruleId } from '../pillars/movement/model.js';
 import { CAL_SEED, uid as calUid } from '../pillars/calendar/model.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useCloudSync } from '../lib/cloudSync.js';
@@ -227,10 +227,10 @@ export function AppStateProvider({ children }) {
       return { ...prev, workouts: [...list, { ...w, id: w.id || uid('wk') }] };
     });
     const deleteWorkout = (id) => setMovement(prev => {
-      const stripList = (arr) => (arr || []).filter(x => x !== id);
-      const recurring = Object.fromEntries(Object.entries(prev.schedule?.recurring || {}).map(([k, v]) => [k, stripList(v)]));
-      const oneOff = Object.fromEntries(Object.entries(prev.schedule?.oneOff || {}).map(([k, v]) => [k, stripList(v)]));
-      return { ...prev, workouts: (prev.workouts || []).filter(w => w.id !== id), schedule: { recurring, oneOff } };
+      const sched = cloneSched(prev.schedule);
+      sched.recurring = Object.fromEntries(Object.entries(sched.recurring).map(([k, v]) => [k, (v || []).filter(r => ruleId(r) !== id)]));
+      sched.oneOff = Object.fromEntries(Object.entries(sched.oneOff).map(([k, v]) => [k, (v || []).filter(x => x !== id)]));
+      return { ...prev, workouts: (prev.workouts || []).filter(w => w.id !== id), schedule: sched };
     });
 
     // Scheduling: bucket = 'recurring' (keyed by weekday 0-6) or 'oneOff' (date)
@@ -274,7 +274,7 @@ export function AppStateProvider({ children }) {
     // for that workout on the same weekday so a future re-add starts clean.
     const removeRecurrence = (dow, workoutId) => setMovement(prev => {
       const sched = cloneSched(prev.schedule);
-      sched.recurring[dow] = (sched.recurring[dow] || []).filter(id => id !== workoutId);
+      sched.recurring[dow] = (sched.recurring[dow] || []).filter(r => ruleId(r) !== workoutId);
       delete sched.until[`${dow}:${workoutId}`];
       for (const dk of Object.keys(sched.skips)) {
         if (new Date(dk + 'T12:00:00').getDay() !== Number(dow)) continue;
@@ -298,6 +298,32 @@ export function AppStateProvider({ children }) {
       }
       const dcur = sched.oneOff[destDateK] || [];
       if (!dcur.includes(item.id)) sched.oneOff[destDateK] = [...dcur, item.id];
+      return { ...prev, schedule: sched };
+    });
+
+    // Add a recurring workout to a weekday with a cadence. freq=1 weekly (stored
+    // as a bare id), freq=2 every-other-week anchored to `anchor`'s ISO week.
+    // Replaces any existing rule for the same workout on that weekday.
+    const addRecurringWorkout = (dow, workoutId, freq = 1, anchor = null) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      const k = String(dow);
+      const list = (sched.recurring[k] || []).filter(r => ruleId(r) !== workoutId);
+      list.push(freq > 1 ? { id: workoutId, freq, anchor } : workoutId);
+      sched.recurring[k] = list;
+      delete sched.until[`${k}:${workoutId}`]; // fresh series
+      return { ...prev, schedule: sched };
+    });
+
+    // Move a whole recurring series to a different weekday (preserves cadence).
+    const moveRecurringDay = (fromDow, workoutId, toDow) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      const from = String(fromDow), to = String(toDow);
+      if (from === to) return prev;
+      const rule = (sched.recurring[from] || []).find(r => ruleId(r) === workoutId);
+      sched.recurring[from] = (sched.recurring[from] || []).filter(r => ruleId(r) !== workoutId);
+      sched.recurring[to] = [...(sched.recurring[to] || []).filter(r => ruleId(r) !== workoutId), rule === undefined ? workoutId : rule];
+      const u = sched.until[`${from}:${workoutId}`];
+      if (u) { delete sched.until[`${from}:${workoutId}`]; sched.until[`${to}:${workoutId}`] = u; }
       return { ...prev, schedule: sched };
     });
 
@@ -428,7 +454,7 @@ export function AppStateProvider({ children }) {
       movement: mv,
       saveExercise, deleteExercise, saveWorkout, deleteWorkout,
       scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
-      skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence,
+      skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence, addRecurringWorkout, moveRecurringDay,
       reflection: refl, setDayIntent, setDayEvening,
       calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
       addSubscription, updateSubscription, removeSubscription, setSubCache,

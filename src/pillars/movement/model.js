@@ -3,10 +3,13 @@
 // Data shape (persisted as intent.movement):
 //   exercises: [{ id, name, kind, description }]
 //   workouts:  [{ id, name, description, items: [{ exerciseId, sets, reps, weight, duration, distance }] }]
-//   schedule:  { recurring: { '0'..'6': [workoutId] },   // repeats every week by weekday
+//   schedule:  { recurring: { '0'..'6': [ rule ] },       // repeats by weekday
 //               oneOff:    { 'YYYY-MM-DD': [workoutId] }, // a single dated assignment
 //               skips:     { 'YYYY-MM-DD': [workoutId] }, // suppress one recurring occurrence
 //               until:     { '<dow>:<workoutId>': 'YYYY-MM-DD' } } // series ends after this date
+//   A recurring `rule` is either a bare workoutId string (= every week) or
+//   { id, freq, anchor }: freq=2 means every-other-week, anchored to the ISO
+//   week of `anchor` (so two biweekly rules on the same weekday alternate).
 //   sessions:  [{ id, date, at, workoutId, name, durationMin, notes,
 //                 entries: [{ exerciseId, name, kind, sets:[{reps,weight}], duration, distance, done }] }]
 //   weights:   { 'YYYY-MM-DD': number }   // daily bodyweight log, one entry per day
@@ -48,9 +51,29 @@ export function kindOf(id) {
   return EXERCISE_KINDS[id] || EXERCISE_KINDS.strength;
 }
 
+// Recurring rule accessors (a rule is a string or { id, freq, anchor }).
+export const ruleId = (r) => (typeof r === 'string' ? r : r.id);
+export const ruleFreq = (r) => (typeof r === 'string' ? 1 : (r.freq || 1));
+export const ruleAnchor = (r) => (typeof r === 'string' ? null : r.anchor || null);
+
+// Monday-anchored absolute week number (for every-other-week parity).
+export function weekIndex(d) {
+  return Math.floor(weekStart(d).getTime() / (7 * 86400000));
+}
+
+// Does a recurring rule fall on date d's week, given its cadence?
+export function ruleActiveOnWeek(rule, d) {
+  const freq = ruleFreq(rule);
+  if (freq <= 1) return true;
+  const anchor = ruleAnchor(rule);
+  if (!anchor) return true;
+  const diff = weekIndex(d) - weekIndex(new Date(`${anchor}T12:00:00`));
+  return (((diff % freq) + freq) % freq) === 0;
+}
+
 // What's scheduled for a given date: one-off entries for that exact date plus
-// the recurring entries for that weekday — minus any occurrence that's been
-// skipped (moved/removed for just that day) or that falls after its series'
+// the recurring rules for that weekday whose cadence lands on this week — minus
+// any occurrence skipped (moved/removed for just that day) or past its series'
 // end date. De-duped, returns workout ids.
 export function scheduledFor(schedule, d = new Date()) {
   if (!schedule) return [];
@@ -58,12 +81,15 @@ export function scheduledFor(schedule, d = new Date()) {
   const dk = dateKey(d);
   const skips = (schedule.skips && schedule.skips[dk]) || [];
   const until = schedule.until || {};
-  const recurring = ((schedule.recurring && schedule.recurring[dow]) || []).filter(id => {
-    if (skips.includes(id)) return false;          // this single occurrence removed/moved
+  const recurring = [];
+  for (const rule of ((schedule.recurring && schedule.recurring[dow]) || [])) {
+    const id = ruleId(rule);
+    if (skips.includes(id)) continue;               // this single occurrence removed/moved
     const u = until[`${dow}:${id}`];
-    if (u && dk > u) return false;                  // series ended before this date
-    return true;
-  });
+    if (u && dk > u) continue;                       // series ended before this date
+    if (!ruleActiveOnWeek(rule, d)) continue;        // off-week for an every-other-week rule
+    recurring.push(id);
+  }
   const oneOff = (schedule.oneOff && schedule.oneOff[dk]) || [];
   return [...new Set([...oneOff, ...recurring])];
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { DAY_LABELS } from './model.js';
+import { DAY_LABELS, ruleId, ruleFreq, ruleActiveOnWeek } from './model.js';
 import { dateKey, weekStart, addDays } from '../../lib/dates.js';
 import { ACCENT, EmptyHint } from './ui.jsx';
 
@@ -9,7 +9,7 @@ import { ACCENT, EmptyHint } from './ui.jsx';
 // (every week, by weekday) or one-time (a specific date). Add via the day's +,
 // drag a chip to another day to move it, tap × to remove. Page weeks with ‹ ›.
 export function WeeklySchedule({ workouts, onCreateWorkout }) {
-  const { movement, scheduleWorkout, unscheduleWorkout, moveOccurrence, skipOccurrence, endRecurrence, removeRecurrence } = useApp();
+  const { movement, scheduleWorkout, unscheduleWorkout, moveOccurrence, skipOccurrence, endRecurrence, removeRecurrence, addRecurringWorkout, moveRecurringDay } = useApp();
   const sched = movement.schedule || { recurring: {}, oneOff: {}, skips: {}, until: {} };
   const wkById = Object.fromEntries(workouts.map(w => [w.id, w]));
 
@@ -18,6 +18,7 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
   const [removing, setRemoving] = React.useState(null); // { item, day } — recurring removal sheet
   const [acting, setActing] = React.useState(null);   // { item, day } — tap-a-chip action sheet
   const [picking, setPicking] = React.useState(null); // { item, day } — reschedule day picker
+  const [dropChoice, setDropChoice] = React.useState(null); // { item, target } — series-vs-week on drag-drop
   const [drag, setDrag] = React.useState(null);       // floating chip while dragging
   const [overDay, setOverDay] = React.useState(null);
   const dragRef = React.useRef(null); dragRef.current = drag;
@@ -31,8 +32,13 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
     const dk = dateKey(date);
     const skips = (sched.skips && sched.skips[dk]) || [];
     const recurring = (sched.recurring[String(dow)] || [])
-      .filter(id => !skips.includes(id) && !(until[`${dow}:${id}`] && dk > until[`${dow}:${id}`]))
-      .map(id => ({ id, bucket: 'recurring', key: String(dow), dk }));
+      .filter(r => {
+        const id = ruleId(r);
+        if (skips.includes(id)) return false;
+        if (until[`${dow}:${id}`] && dk > until[`${dow}:${id}`]) return false;
+        return ruleActiveOnWeek(r, date);
+      })
+      .map(r => ({ id: ruleId(r), bucket: 'recurring', key: String(dow), dk, freq: ruleFreq(r) }));
     const oneOff = (sched.oneOff[dk] || []).map(id => ({ id, bucket: 'oneOff', key: dk, dk }));
     return { i, date, dow, dk, items: [...recurring, ...oneOff] };
   });
@@ -60,10 +66,15 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
         // Tap → open the per-occurrence action sheet.
         setActing({ item: { bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, day: d.day });
       } else if (d && d.moved) {
-        // Drag → move just this occurrence; the weekly series is untouched.
         const target = overDay != null ? days[overDay] : null;
         if (target && target.dk !== d.dk) {
-          moveOccurrence({ bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, target.dk);
+          const item = { bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId };
+          if (d.bucket === 'recurring') {
+            // Recurring → ask whether to move just this week or the whole series.
+            setDropChoice({ item, target: { dk: target.dk, dow: target.dow } });
+          } else {
+            moveOccurrence(item, target.dk);
+          }
         }
       }
       setDrag(null); setOverDay(null);
@@ -131,7 +142,11 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
                       padding: '6px 11px', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
                       opacity: isDragging ? 0.4 : 1,
                     }}>
-                    {item.bucket === 'recurring' && <span title="repeats weekly" style={{ color: ACCENT, fontSize: 11 }}>↻</span>}
+                    {item.bucket === 'recurring' && (
+                      <span title={item.freq > 1 ? 'every other week' : 'repeats weekly'} style={{ display: 'inline-flex', alignItems: 'center', color: ACCENT, fontSize: 11 }}>
+                        ↻{item.freq > 1 && <span style={{ fontSize: 8, fontWeight: 700, marginLeft: 1 }}>2w</span>}
+                      </span>
+                    )}
                     {w.name}
                   </span>
                 );
@@ -142,7 +157,7 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
       })}
 
       <p style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, textAlign: 'center', marginTop: 6, lineHeight: 1.5 }}>
-        ↻ repeats weekly · tap a workout for options · drag to move that day
+        ↻ weekly · ↻2w every other week · tap for options · drag to move
       </p>
 
       {/* Floating drag chip */}
@@ -162,11 +177,23 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
           day={adding}
           workouts={workouts}
           onClose={() => setAdding(null)}
-          onAdd={(workoutId, recurring) => {
-            if (recurring) scheduleWorkout('recurring', String(adding.dow), workoutId);
+          onAdd={(workoutId, mode) => {
+            if (mode === 'weekly') addRecurringWorkout(String(adding.dow), workoutId, 1);
+            else if (mode === 'biweekly') addRecurringWorkout(String(adding.dow), workoutId, 2, adding.dk);
             else scheduleWorkout('oneOff', adding.dk, workoutId);
             setAdding(null);
           }}
+        />
+      )}
+
+      {/* Drag-drop: move just this week or the whole series */}
+      {dropChoice && (
+        <MoveOccurrence
+          workoutName={wkById[dropChoice.item.id]?.name || 'workout'}
+          target={dropChoice.target}
+          onClose={() => setDropChoice(null)}
+          onThisWeek={() => { moveOccurrence(dropChoice.item, dropChoice.target.dk); setDropChoice(null); }}
+          onSeries={() => { moveRecurringDay(dropChoice.item.key, dropChoice.item.id, dropChoice.target.dow); setDropChoice(null); }}
         />
       )}
 
@@ -317,7 +344,12 @@ const navBtn = {
 };
 
 function AddToDay({ day, workouts, onClose, onAdd }) {
-  const [recurring, setRecurring] = React.useState(true);
+  const [mode, setMode] = React.useState('weekly');
+  const modes = [
+    { id: 'weekly', label: 'Every week' },
+    { id: 'biweekly', label: 'Every other' },
+    { id: 'once', label: 'Just once' },
+  ];
   return (
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(40px + var(--safe-bottom))' }}>
@@ -325,14 +357,18 @@ function AddToDay({ day, workouts, onClose, onAdd }) {
         <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Add to {DAY_LABELS[day.dow]}</div>
         <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 14 }}>{day.date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setRecurring(true)} style={toggleStyle(recurring)}>↻ Every week</button>
-          <button onClick={() => setRecurring(false)} style={toggleStyle(!recurring)}>Just this day</button>
+        <div style={{ display: 'flex', gap: 6, marginBottom: mode === 'biweekly' ? 8 : 16 }}>
+          {modes.map(m => <button key={m.id} onClick={() => setMode(m.id)} style={toggleStyle(mode === m.id)}>{m.label}</button>)}
         </div>
+        {mode === 'biweekly' && (
+          <div style={{ fontFamily: T.fontSans, fontSize: 11.5, color: T.muted, lineHeight: 1.5, marginBottom: 14 }}>
+            Runs this {DAY_LABELS[day.dow]}, then every other week. Add a second workout the same way next week and they'll alternate (A/B weeks).
+          </div>
+        )}
 
         <div className="intent-scroll" style={{ maxHeight: 260, overflowY: 'auto' }}>
           {workouts.map(w => (
-            <button key={w.id} onClick={() => onAdd(w.id, recurring)} style={{
+            <button key={w.id} onClick={() => onAdd(w.id, mode)} style={{
               display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
               padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left',
               background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
@@ -346,10 +382,40 @@ function AddToDay({ day, workouts, onClose, onAdd }) {
     </div>
   );
 }
+
+// Drag-drop choice for a recurring workout — like moving a repeating calendar event.
+function MoveOccurrence({ workoutName, target, onClose, onThisWeek, onSeries }) {
+  const dayName = DAY_LABELS[target.dow];
+  const rows = [
+    { label: 'Just this week', sub: 'Move only this week — the repeat stays put', onClick: onThisWeek },
+    { label: 'The whole series', sub: `Repeat on ${dayName} from now on`, onClick: onSeries },
+  ];
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(40px + var(--safe-bottom))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 4, borderRadius: 999, background: T.border }} /></div>
+        <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Move “{workoutName}” to {dayName}</div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 16 }}>This workout repeats — apply the move to…</div>
+        {rows.map((r, i) => (
+          <button key={i} onClick={r.onClick} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%',
+            padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left',
+            background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
+          }}>
+            <span style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>{r.label}</span>
+            <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{r.sub}</span>
+          </button>
+        ))}
+        <button onClick={onClose} style={{ width: '100%', padding: '12px', marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function toggleStyle(active) {
   return {
-    flex: 1, padding: '11px', borderRadius: 10, cursor: 'pointer',
+    flex: 1, padding: '10px 6px', borderRadius: 10, cursor: 'pointer',
     border: `1px solid ${active ? ACCENT : T.border}`, background: active ? `${ACCENT}14` : T.card,
-    fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: active ? T.ink : T.muted,
+    fontFamily: T.fontSans, fontSize: 12.5, fontWeight: 600, color: active ? T.ink : T.muted,
   };
 }
