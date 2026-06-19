@@ -6,7 +6,7 @@ import {
   dateKey, addDays, addMonths, startOfMonth, isSameDay,
 } from '../lib/dates.js';
 import {
-  fmtTime, fmtHourLabel, minutesOf, layoutTimed, compareItems, buildICS, DEFAULT_EVENT_COLOR,
+  fmtTime, fmtHourLabel, minutesOf, layoutTimed, compareItems, buildICS, DEFAULT_EVENT_COLOR, pad2,
 } from '../pillars/calendar/model.js';
 import { itemsForRange, itemsForDate, inboxTasks, CAL_SOURCES } from '../pillars/calendar/sources.js';
 import { CalendarComposer } from '../pillars/calendar/CalendarComposer.jsx';
@@ -174,6 +174,57 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
     onCreate(Math.max(0, Math.min(23, Math.floor(y / HOUR))));
   };
 
+  // ── Drag-to-move + resize (native events only) ──────────────────────────────
+  const SNAP = 15;
+  const hhmm = (min) => `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
+  const [drag, setDrag] = React.useState(null);
+  const dragRef = React.useRef(null); dragRef.current = drag;
+
+  React.useEffect(() => {
+    if (!drag) return;
+    const move = (e) => {
+      const d = dragRef.current; if (!d) return;
+      const dy = e.clientY - d.startY;
+      const deltaMin = Math.round((dy / HOUR * 60) / SNAP) * SNAP;
+      const moved = d.moved || Math.abs(dy) > 4;
+      let ps = d.origStart, pe = d.origEnd;
+      if (d.mode === 'move') {
+        const dur = d.origEnd - d.origStart;
+        ps = Math.max(0, Math.min(1440 - dur, d.origStart + deltaMin));
+        pe = ps + dur;
+      } else {
+        pe = Math.max(d.origStart + SNAP, Math.min(1440, d.origEnd + deltaMin));
+      }
+      setDrag({ ...d, previewStart: ps, previewEnd: pe, moved });
+      if (e.cancelable) e.preventDefault();
+    };
+    const up = () => {
+      const d = dragRef.current;
+      if (d) {
+        if (!d.moved) onItem(d.item);
+        else {
+          const sDate = d.ev.start.slice(0, 10);
+          const eDate = (d.ev.end || d.ev.start).slice(0, 10);
+          app.saveEvent({ ...d.ev, start: `${sDate}T${hhmm(d.previewStart)}`, end: `${eDate}T${hhmm(d.previewEnd)}` });
+        }
+      }
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, [drag ? drag.id + drag.mode : null]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startDrag = (e, it, mode) => {
+    e.stopPropagation();
+    setDrag({ id: it.id, mode, startY: e.clientY, origStart: it.start, origEnd: it.end, previewStart: it.start, previewEnd: it.end, moved: false, ev: it.ref, item: it });
+  };
+
   return (
     <div>
       {/* All-day lane */}
@@ -209,21 +260,40 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
 
           {/* events */}
           {laid.map(it => {
-            const top = (it.start / 60) * HOUR;
-            const height = Math.max(20, ((it.end - it.start) / 60) * HOUR - 2);
-            const leftPct = it.col / it.cols;
-            const widthCalc = `calc((100% - ${GUTTER + 6}px) / ${it.cols} - 3px)`;
+            const dr = drag && drag.id === it.id ? drag : null;
+            const sMin = dr ? dr.previewStart : it.start;
+            const eMin = dr ? dr.previewEnd : it.end;
+            const top = (sMin / 60) * HOUR;
+            const height = Math.max(20, ((eMin - sMin) / 60) * HOUR - 2);
+            const leftPct = dr ? 0 : it.col / it.cols;
+            const widthCalc = dr ? `calc(100% - ${GUTTER + 6}px)` : `calc((100% - ${GUTTER + 6}px) / ${it.cols} - 3px)`;
             const leftCalc = `calc(${GUTTER}px + (100% - ${GUTTER + 6}px) * ${leftPct})`;
+            const draggable = it.kind === 'event';
+            const tLabel = `${fmtTime(new Date(0, 0, 0, Math.floor(sMin / 60), sMin % 60))}`;
             return (
-              <button key={it.id} onClick={() => onItem(it)} style={{
-                position: 'absolute', top, height, left: leftCalc, width: widthCalc,
-                background: `${it.color}26`, borderLeft: `3px solid ${it.color}`, borderRadius: 6,
-                padding: '3px 6px', textAlign: 'left', cursor: 'pointer', overflow: 'hidden',
-                display: 'flex', flexDirection: 'column', border: 'none', borderLeftWidth: 3, borderLeftStyle: 'solid', borderLeftColor: it.color,
-              }}>
+              <div key={it.id}
+                onPointerDown={draggable ? (e) => startDrag(e, it, 'move') : undefined}
+                onClick={draggable ? undefined : () => onItem(it)}
+                style={{
+                  position: 'absolute', top, height, left: leftCalc, width: widthCalc,
+                  background: `${it.color}26`, borderRadius: 6,
+                  borderLeft: `3px solid ${it.color}`,
+                  padding: '3px 6px', textAlign: 'left', cursor: draggable ? 'grab' : 'pointer', overflow: 'hidden',
+                  display: 'flex', flexDirection: 'column',
+                  touchAction: draggable ? 'none' : 'auto',
+                  zIndex: dr ? 20 : 1, boxShadow: dr ? '0 6px 18px rgba(44,36,24,0.22)' : 'none',
+                }}>
                 <span style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.ink, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: it.done ? 'line-through' : 'none' }}>{it.title}</span>
-                {height > 30 && <span style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted }}>{fmtTime(it.start ? new Date(0, 0, 0, Math.floor(it._s / 60), it._s % 60) : null)}</span>}
-              </button>
+                {(height > 30 || dr) && <span style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted }}>{tLabel}</span>}
+                {draggable && (
+                  <span onPointerDown={(e) => startDrag(e, it, 'resize')} style={{
+                    position: 'absolute', left: 0, right: 0, bottom: 0, height: 12, cursor: 'ns-resize', touchAction: 'none',
+                    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                  }}>
+                    <span style={{ width: 22, height: 3, borderRadius: 2, background: it.color, marginBottom: 2, opacity: 0.6 }} />
+                  </span>
+                )}
+              </div>
             );
           })}
 
