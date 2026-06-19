@@ -40,7 +40,7 @@ export function CalendarScreen() {
   const changeView = (v) => { setView(v); setCalendarView(v); };
   const shift = (dir) => {
     if (view === 'month') setCursor(c => addMonths(c, dir));
-    else if (view === 'agenda') setCursor(c => addDays(c, dir * 7));
+    else if (view === 'week' || view === 'agenda') setCursor(c => addDays(c, dir * 7));
     else setCursor(c => addDays(c, dir));
   };
 
@@ -51,11 +51,14 @@ export function CalendarScreen() {
     else if (it.kind === 'routine') navigateToPillar('routine', it.ref.id);
   };
 
+  const weekSun = addDays(cursor, -cursor.getDay());
   const title = view === 'month'
     ? `${MONTHS[cursor.getMonth()]} ${cursor.getFullYear()}`
     : view === 'agenda'
       ? 'Upcoming'
-      : (isSameDay(cursor, now) ? 'Today' : DOW[cursor.getDay()]);
+      : view === 'week'
+        ? `${weekSun.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${addDays(weekSun, 6).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        : (isSameDay(cursor, now) ? 'Today' : DOW[cursor.getDay()]);
   const subtitle = view === 'day'
     ? cursor.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null;
@@ -82,7 +85,7 @@ export function CalendarScreen() {
 
         {/* View switcher */}
         <div style={{ display: 'flex', gap: 4, background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12, padding: 4 }}>
-          {['day', 'month', 'agenda'].map(v => (
+          {['day', 'week', 'month', 'agenda'].map(v => (
             <button key={v} onClick={() => changeView(v)} style={{
               flex: 1, padding: '8px 4px', borderRadius: 9, border: 'none', cursor: 'pointer',
               background: view === v ? T.card : 'transparent', boxShadow: view === v ? '0 1px 4px rgba(44,36,24,0.1)' : 'none',
@@ -97,6 +100,7 @@ export function CalendarScreen() {
       {/* Body */}
       <div className="intent-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
         {view === 'day' && <DayView app={app} cursor={cursor} now={now} onItem={openItem} onCreate={(h) => setComposer({ mode: 'event', date: dateKey(cursor), startHour: h })} />}
+        {view === 'week' && <WeekView app={app} cursor={cursor} now={now} onItem={openItem} onPickDay={(d) => { setCursor(d); changeView('day'); }} onCreate={(d, h) => setComposer({ mode: 'event', date: dateKey(d), startHour: h })} />}
         {view === 'month' && <MonthView app={app} cursor={cursor} now={now} onPickDay={(d) => { setCursor(d); changeView('day'); }} />}
         {view === 'agenda' && <AgendaView app={app} cursor={cursor} now={now} onItem={openItem} onToggle={toggleTask} />}
       </div>
@@ -303,6 +307,113 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
               <span style={{ position: 'absolute', left: -5, top: -4, width: 8, height: 8, borderRadius: '50%', background: '#B8453E' }} />
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Week view (7-day time grid) ──────────────────────────────────────────────
+function WeekView({ app, cursor, now, onItem, onPickDay, onCreate }) {
+  const scrollRef = React.useRef(null);
+  const sunday = addDays(cursor, -cursor.getDay());
+  const days = Array.from({ length: 7 }, (_, i) => addDays(sunday, i));
+  const all = itemsForRange(app, sunday, addDays(sunday, 6));
+  const byDate = {};
+  all.forEach(it => { (byDate[it.date] = byDate[it.date] || []).push(it); });
+
+  React.useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = (7 * 60 / 60) * HOUR;
+  }, [dateKey(sunday)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const colLeft = (d, sub, cols) => `calc(${GUTTER}px + (100% - ${GUTTER}px) * ${d / 7} + ((100% - ${GUTTER}px) / 7) * ${sub / cols})`;
+  const colWidth = (cols) => `calc((100% - ${GUTTER}px) / 7 / ${cols} - 1px)`;
+
+  return (
+    <div>
+      {/* Day headers */}
+      <div style={{ display: 'flex', paddingLeft: GUTTER, position: 'sticky', top: 0, background: T.bg, zIndex: 6, paddingBottom: 4 }}>
+        {days.map((d, i) => {
+          const today = isSameDay(d, now);
+          const sel = isSameDay(d, cursor);
+          return (
+            <button key={i} onClick={() => onPickDay(new Date(d))} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '2px 0',
+              background: 'none', border: 'none', cursor: 'pointer',
+            }}>
+              <span style={{ fontFamily: T.fontSans, fontSize: 9, color: T.muted, fontWeight: 500 }}>{DOW1[i]}</span>
+              <span style={{
+                width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
+                background: today ? T.amber : 'transparent', color: today ? '#FAF7F2' : sel ? T.amber : T.ink,
+              }}>{d.getDate()}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* All-day lane (compact) */}
+      <div style={{ display: 'flex', paddingLeft: GUTTER, borderBottom: `0.5px solid ${T.border}`, minHeight: 6, marginBottom: 2 }}>
+        {days.map((d, i) => {
+          const ad = (byDate[dateKey(d)] || []).filter(it => it.allDay);
+          return (
+            <div key={i} style={{ flex: 1, padding: '0 1px 3px', minWidth: 0 }}>
+              {ad.slice(0, 2).map(it => (
+                <button key={it.id} onClick={() => onItem(it)} style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', background: `${it.color}2E`, borderRadius: 3, padding: '1px 3px', marginTop: 2, overflow: 'hidden' }}>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 8, fontWeight: 600, color: T.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', textDecoration: it.done ? 'line-through' : 'none' }}>{it.title}</span>
+                </button>
+              ))}
+              {ad.length > 2 && <span style={{ fontFamily: T.fontSans, fontSize: 8, color: T.muted, paddingLeft: 3 }}>+{ad.length - 2}</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Hour grid */}
+      <div ref={scrollRef} style={{ position: 'relative', overflowX: 'hidden' }}>
+        <div style={{ position: 'relative', height: 24 * HOUR }}>
+          {Array.from({ length: 24 }, (_, h) => (
+            <div key={h} style={{ position: 'absolute', top: h * HOUR, left: 0, right: 0, height: HOUR, borderTop: `0.5px solid ${T.border}` }}>
+              <span style={{ position: 'absolute', left: 0, top: -7, width: GUTTER - 6, textAlign: 'right', fontFamily: T.fontSans, fontSize: 9, color: T.muted }}>{h === 0 ? '' : fmtHourLabel(h).replace(' ', '')}</span>
+            </div>
+          ))}
+          {/* day separators */}
+          {days.map((_, i) => i > 0 && <div key={i} style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(${GUTTER}px + (100% - ${GUTTER}px) * ${i / 7})`, width: '0.5px', background: T.border }} />)}
+
+          {/* tap-to-create per day */}
+          {days.map((d, i) => (
+            <div key={i} onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              onCreate(new Date(d), Math.max(0, Math.min(23, Math.floor((e.clientY - rect.top) / HOUR))));
+            }} style={{ position: 'absolute', top: 0, height: 24 * HOUR, left: `calc(${GUTTER}px + (100% - ${GUTTER}px) * ${i / 7})`, width: `calc((100% - ${GUTTER}px) / 7)` }} />
+          ))}
+
+          {/* events per day */}
+          {days.map((d, di) => {
+            const timed = (byDate[dateKey(d)] || []).filter(it => !it.allDay && it.start)
+              .map(it => ({ ...it, start: minutesOf(it.start), end: Math.max(minutesOf(it.start) + 20, minutesOf(it.end || it.start)) }));
+            const laid = layoutTimed(timed);
+            return laid.map(it => {
+              const top = (it.start / 60) * HOUR;
+              const height = Math.max(14, ((it.end - it.start) / 60) * HOUR - 2);
+              return (
+                <button key={it.id} onClick={() => onItem(it)} style={{
+                  position: 'absolute', top, height, left: colLeft(di, it.col, it.cols), width: colWidth(it.cols),
+                  background: `${it.color}2E`, borderLeft: `2px solid ${it.color}`, borderRadius: 4,
+                  padding: '1px 2px', textAlign: 'left', cursor: 'pointer', overflow: 'hidden', border: 'none', borderLeft: `2px solid ${it.color}`,
+                }}>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 8.5, fontWeight: 600, color: T.ink, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{it.title}</span>
+                </button>
+              );
+            });
+          })}
+
+          {/* now line in today's column */}
+          {days.map((d, i) => isSameDay(d, now) && (
+            <div key={`n${i}`} style={{ position: 'absolute', top: (minutesOf(now) / 60) * HOUR, height: 0, left: `calc(${GUTTER}px + (100% - ${GUTTER}px) * ${i / 7})`, width: `calc((100% - ${GUTTER}px) / 7)`, borderTop: '1.5px solid #B8453E', zIndex: 5 }}>
+              <span style={{ position: 'absolute', left: -3, top: -3, width: 6, height: 6, borderRadius: '50%', background: '#B8453E' }} />
+            </div>
+          ))}
         </div>
       </div>
     </div>
