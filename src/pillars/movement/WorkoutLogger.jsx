@@ -2,7 +2,8 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { kindOf, FIELD_META } from './model.js';
-import { BackBar, PrimaryBtn, NumberField, ACCENT } from './ui.jsx';
+import { usePointerSort, arrayMove } from './dnd.js';
+import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
 import { haptics } from '../../lib/haptics.js';
 
@@ -63,6 +64,11 @@ export function WorkoutLogger({ workout, onClose }) {
   const [durationMin, setDurationMin] = React.useState('');
   const [notes, setNotes] = React.useState('');
 
+  // Drag to reorder exercises mid-workout (same primitive as the builder).
+  const rowRefs = React.useRef([]);
+  const getRects = React.useCallback(() => rowRefs.current.map(el => el?.getBoundingClientRect()), []);
+  const { drag, start } = usePointerSort(entries.length, (from, to) => setEntries(prev => arrayMove(prev, from, to)), getRects);
+
   const patch = (i, p) => setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, ...p } : e));
   const patchSet = (i, si, p) => setEntries(prev => prev.map((e, idx) => {
     if (idx !== i) return e;
@@ -100,8 +106,15 @@ export function WorkoutLogger({ workout, onClose }) {
 
       {entries.map((e, i) => {
         const k = kindOf(e.kind);
+        const dragging = drag?.from === i;
+        const showInsert = drag && drag.over === i && drag.from !== i;
         return (
-          <div key={i} style={{ background: T.card, border: `0.5px solid ${e.done ? ACCENT : T.border}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+          <div key={i} ref={el => (rowRefs.current[i] = el)}>
+          {showInsert && <div style={{ height: 2, background: ACCENT, borderRadius: 2, margin: '4px 0' }} />}
+          <div style={{
+            background: T.card, border: `0.5px solid ${e.done ? ACCENT : T.border}`, borderRadius: 14, padding: 14, marginBottom: 10,
+            opacity: dragging ? 0.6 : 1, boxShadow: dragging ? '0 6px 18px rgba(44,36,24,0.16)' : 'none',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <button onClick={() => { if (!e.done) haptics.done(); patch(i, { done: !e.done }); }} style={{
                 width: 24, height: 24, borderRadius: '50%', flexShrink: 0, cursor: 'pointer',
@@ -116,6 +129,7 @@ export function WorkoutLogger({ workout, onClose }) {
                   {summarizeLast(lastByEx[e.exerciseId]) || k.label}
                 </div>
               </div>
+              <DragHandle onPointerDown={(ev) => start(i, ev)} />
             </div>
 
             {k.perSet ? (
@@ -138,6 +152,7 @@ export function WorkoutLogger({ workout, onClose }) {
                 ))}
               </div>
             )}
+          </div>
           </div>
         );
       })}

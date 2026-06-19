@@ -16,6 +16,8 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
   const [weekOffset, setWeekOffset] = React.useState(0);
   const [adding, setAdding] = React.useState(null);   // { dayIndex, date, dow }
   const [removing, setRemoving] = React.useState(null); // { item, day } — recurring removal sheet
+  const [acting, setActing] = React.useState(null);   // { item, day } — tap-a-chip action sheet
+  const [picking, setPicking] = React.useState(null); // { item, day } — reschedule day picker
   const [drag, setDrag] = React.useState(null);       // floating chip while dragging
   const [overDay, setOverDay] = React.useState(null);
   const dragRef = React.useRef(null); dragRef.current = drag;
@@ -40,19 +42,29 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
     if (!drag) return;
     const move = (e) => {
       const x = e.clientX, y = e.clientY;
-      setDrag(d => d ? { ...d, x, y } : d);
-      const el = document.elementsFromPoint(x, y).find(n => n.dataset && n.dataset.day != null);
-      setOverDay(el ? Number(el.dataset.day) : null);
-      if (e.cancelable) e.preventDefault();
+      const d0 = dragRef.current;
+      if (!d0) return;
+      // Only promote a press to a drag once the finger has actually moved — a
+      // stationary press is a tap, which opens the action sheet on release.
+      const moved = d0.moved || Math.hypot(x - d0.startX, y - d0.startY) > 6;
+      setDrag(d => d ? { ...d, x, y, moved } : d);
+      if (moved) {
+        const el = document.elementsFromPoint(x, y).find(n => n.dataset && n.dataset.day != null);
+        setOverDay(el ? Number(el.dataset.day) : null);
+        if (e.cancelable) e.preventDefault();
+      }
     };
     const up = () => {
       const d = dragRef.current;
-      const target = overDay != null ? days[overDay] : null;
-      // Moving an instance affects only that day — a recurring occurrence becomes
-      // a one-off on the new day and is skipped on its original day; the weekly
-      // series is untouched.
-      if (d && target && target.dk !== d.dk) {
-        moveOccurrence({ bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, target.dk);
+      if (d && !d.moved) {
+        // Tap → open the per-occurrence action sheet.
+        setActing({ item: { bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, day: d.day });
+      } else if (d && d.moved) {
+        // Drag → move just this occurrence; the weekly series is untouched.
+        const target = overDay != null ? days[overDay] : null;
+        if (target && target.dk !== d.dk) {
+          moveOccurrence({ bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, target.dk);
+        }
       }
       setDrag(null); setOverDay(null);
     };
@@ -66,8 +78,8 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
     };
   }, [drag, overDay, days, moveOccurrence]);
 
-  const startDrag = (e, item, workoutId) => {
-    setDrag({ ...item, workoutId, x: e.clientX, y: e.clientY });
+  const startDrag = (e, item, day) => {
+    setDrag({ ...item, workoutId: item.id, day, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, moved: false });
   };
 
   if (workouts.length === 0) {
@@ -109,24 +121,18 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
               {day.items.map((item, ci) => {
                 const w = wkById[item.id];
                 if (!w) return null;
-                const isDragging = drag && drag.workoutId === item.id && drag.key === item.key;
+                const isDragging = drag && drag.moved && drag.dk === item.dk && drag.workoutId === item.id && drag.key === item.key;
                 return (
                   <span key={ci}
-                    onPointerDown={(e) => startDrag(e, item, item.id)}
+                    onPointerDown={(e) => startDrag(e, item, day)}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 6, touchAction: 'none', cursor: 'grab',
                       background: `${ACCENT}1A`, color: T.ink, border: `0.5px solid ${ACCENT}55`, borderRadius: 999,
-                      padding: '6px 10px', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
+                      padding: '6px 11px', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
                       opacity: isDragging ? 0.4 : 1,
                     }}>
                     {item.bucket === 'recurring' && <span title="repeats weekly" style={{ color: ACCENT, fontSize: 11 }}>↻</span>}
                     {w.name}
-                    <button onClick={(e) => {
-                      e.stopPropagation();
-                      if (item.bucket === 'recurring') setRemoving({ item, day });
-                      else unscheduleWorkout('oneOff', item.key, item.id);
-                    }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
                   </span>
                 );
               })}
@@ -136,11 +142,11 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
       })}
 
       <p style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, textAlign: 'center', marginTop: 6, lineHeight: 1.5 }}>
-        ↻ repeats weekly · drag to move just that day · tap × to remove
+        ↻ repeats weekly · tap a workout for options · drag to move that day
       </p>
 
       {/* Floating drag chip */}
-      {drag && (
+      {drag && drag.moved && (
         <div style={{
           position: 'fixed', left: drag.x, top: drag.y, transform: 'translate(-50%, -130%)',
           zIndex: 500, pointerEvents: 'none',
@@ -179,6 +185,34 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
           onEveryWeek={() => { removeRecurrence(String(removing.day.dow), removing.item.id); setRemoving(null); }}
         />
       )}
+
+      {/* Tap-a-chip action sheet — move to today / reschedule / remove */}
+      {acting && (
+        <OccurrenceActions
+          acting={acting}
+          workoutName={wkById[acting.item.id]?.name || 'workout'}
+          isToday={acting.item.dk === todayKeyStr}
+          onClose={() => setActing(null)}
+          onMoveToday={() => { moveOccurrence(acting.item, todayKeyStr); setActing(null); }}
+          onReschedule={() => { setPicking(acting); setActing(null); }}
+          onRemove={() => {
+            if (acting.item.bucket === 'recurring') setRemoving({ item: acting.item, day: acting.day });
+            else unscheduleWorkout('oneOff', acting.item.key, acting.item.id);
+            setActing(null);
+          }}
+        />
+      )}
+
+      {/* Reschedule — pick a day in the viewed week */}
+      {picking && (
+        <DayPicker
+          picking={picking}
+          days={days}
+          workoutName={wkById[picking.item.id]?.name || 'workout'}
+          onClose={() => setPicking(null)}
+          onPick={(dk) => { moveOccurrence(picking.item, dk); setPicking(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -211,6 +245,67 @@ function RemoveOccurrence({ removing, workoutName, onClose, onThisDay, onThisAnd
         ))}
 
         <button onClick={onClose} style={{ width: '100%', padding: '12px', marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// Tapping a scheduled workout opens this: move to today, reschedule, or remove.
+function OccurrenceActions({ acting, workoutName, isToday, onClose, onMoveToday, onReschedule, onRemove }) {
+  const recurring = acting.item.bucket === 'recurring';
+  const dateLabel = acting.day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const rows = [];
+  if (!isToday) rows.push({ label: 'Move to today', sub: 'Just this one', onClick: onMoveToday });
+  rows.push({ label: 'Move to another day…', sub: 'Pick a day this week', onClick: onReschedule });
+  rows.push({ label: recurring ? 'Remove…' : 'Remove', sub: recurring ? 'This day, future, or every week' : 'Take it off this day', onClick: onRemove, danger: true });
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(40px + var(--safe-bottom))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 4, borderRadius: 999, background: T.border }} /></div>
+        <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 4 }}>
+          {workoutName}{recurring ? ' ↻' : ''}
+        </div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 16 }}>{dateLabel}</div>
+        {rows.map((r, i) => (
+          <button key={i} onClick={r.onClick} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%',
+            padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left',
+            background: T.cardCream, border: `0.5px solid ${r.danger ? '#B8453E55' : T.border}`, borderRadius: 12,
+          }}>
+            <span style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: r.danger ? '#B8453E' : T.ink }}>{r.label}</span>
+            <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{r.sub}</span>
+          </button>
+        ))}
+        <button onClick={onClose} style={{ width: '100%', padding: '12px', marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// Reschedule picker — the seven days of the viewed week; the current day is disabled.
+function DayPicker({ picking, days, workoutName, onClose, onPick }) {
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(40px + var(--safe-bottom))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 4, borderRadius: 999, background: T.border }} /></div>
+        <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Move “{workoutName}” to…</div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 14 }}>Just this one — repeats stay put</div>
+        <div className="intent-scroll" style={{ maxHeight: 320, overflowY: 'auto' }}>
+          {days.map(d => {
+            const here = d.dk === picking.item.dk;
+            return (
+              <button key={d.dk} disabled={here} onClick={() => onPick(d.dk)} style={{
+                display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
+                padding: '13px 14px', marginBottom: 8, textAlign: 'left',
+                cursor: here ? 'default' : 'pointer', opacity: here ? 0.5 : 1,
+                background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
+              }}>
+                <span style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>{DAY_LABELS[d.dow]}</span>
+                <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{here ? ' · current' : ''}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

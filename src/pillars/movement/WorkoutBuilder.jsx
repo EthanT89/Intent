@@ -42,6 +42,12 @@ export function WorkoutBuilder({ workout, onClose }) {
     onClose();
   };
 
+  // Spin off a copy (current form state included) as a starting point for a variant.
+  const duplicate = () => {
+    saveWorkout({ id: uid('wk'), name: `${name.trim() || 'Workout'} copy`, description: description.trim(), items });
+    onClose();
+  };
+
   return (
     <div style={{ padding: '10px 16px 120px' }}>
       <BackBar label="Movement" onBack={onClose} title={isNew ? 'New workout' : 'Edit workout'} />
@@ -118,10 +124,16 @@ export function WorkoutBuilder({ workout, onClose }) {
       </PrimaryBtn>
 
       {!isNew && (
-        <button onClick={() => { if (confirmDel) { deleteWorkout(workout.id); onClose(); } else { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); } }}
-          style={{ width: '100%', marginTop: 12, padding: '12px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: '#B8453E' }}>
-          {confirmDel ? 'Tap again to delete' : 'Delete workout'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+          <button onClick={duplicate}
+            style={{ flex: 1, padding: '12px', background: 'none', border: `1px solid ${T.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: ACCENT }}>
+            Duplicate
+          </button>
+          <button onClick={() => { if (confirmDel) { deleteWorkout(workout.id); onClose(); } else { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); } }}
+            style={{ flex: 1, padding: '12px', background: 'none', border: `1px solid ${confirmDel ? '#B8453E' : T.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: '#B8453E' }}>
+            {confirmDel ? 'Tap to confirm' : 'Delete'}
+          </button>
+        </div>
       )}
     </div>
   );
