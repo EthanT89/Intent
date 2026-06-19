@@ -3,7 +3,10 @@
 // Data shape (persisted as intent.movement):
 //   exercises: [{ id, name, kind, description }]
 //   workouts:  [{ id, name, description, items: [{ exerciseId, sets, reps, weight, duration, distance }] }]
-//   schedule:  { recurring: { '0'..'6': [workoutId] }, oneOff: { 'YYYY-MM-DD': [workoutId] } }
+//   schedule:  { recurring: { '0'..'6': [workoutId] },   // repeats every week by weekday
+//               oneOff:    { 'YYYY-MM-DD': [workoutId] }, // a single dated assignment
+//               skips:     { 'YYYY-MM-DD': [workoutId] }, // suppress one recurring occurrence
+//               until:     { '<dow>:<workoutId>': 'YYYY-MM-DD' } } // series ends after this date
 //   sessions:  [{ id, date, at, workoutId, name, durationMin, notes,
 //                 entries: [{ exerciseId, name, kind, sets:[{reps,weight}], duration, distance, done }] }]
 //   weights:   { 'YYYY-MM-DD': number }   // daily bodyweight log, one entry per day
@@ -13,7 +16,7 @@ import { dateKey, isThisMonth, weekStart, addDays } from '../../lib/dates.js';
 export const MOVEMENT_SEED = {
   exercises: [],
   workouts: [],
-  schedule: { recurring: {}, oneOff: {} },
+  schedule: { recurring: {}, oneOff: {}, skips: {}, until: {} },
   sessions: [],
   weights: {},
 };
@@ -46,11 +49,22 @@ export function kindOf(id) {
 }
 
 // What's scheduled for a given date: one-off entries for that exact date plus
-// the recurring entries for that weekday. De-duped, returns workout ids.
+// the recurring entries for that weekday — minus any occurrence that's been
+// skipped (moved/removed for just that day) or that falls after its series'
+// end date. De-duped, returns workout ids.
 export function scheduledFor(schedule, d = new Date()) {
+  if (!schedule) return [];
   const dow = String(d.getDay());
-  const recurring = (schedule.recurring && schedule.recurring[dow]) || [];
-  const oneOff = (schedule.oneOff && schedule.oneOff[dateKey(d)]) || [];
+  const dk = dateKey(d);
+  const skips = (schedule.skips && schedule.skips[dk]) || [];
+  const until = schedule.until || {};
+  const recurring = ((schedule.recurring && schedule.recurring[dow]) || []).filter(id => {
+    if (skips.includes(id)) return false;          // this single occurrence removed/moved
+    const u = until[`${dow}:${id}`];
+    if (u && dk > u) return false;                  // series ended before this date
+    return true;
+  });
+  const oneOff = (schedule.oneOff && schedule.oneOff[dk]) || [];
   return [...new Set([...oneOff, ...recurring])];
 }
 

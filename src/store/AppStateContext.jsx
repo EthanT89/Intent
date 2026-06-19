@@ -193,7 +193,7 @@ export function AppStateProvider({ children }) {
     const mv = {
       exercises: movement.exercises || [],
       workouts: movement.workouts || [],
-      schedule: movement.schedule || { recurring: {}, oneOff: {} },
+      schedule: movement.schedule || { recurring: {}, oneOff: {}, skips: {}, until: {} },
       sessions: movement.sessions || [],
       weights: movement.weights || {},
     };
@@ -229,14 +229,69 @@ export function AppStateProvider({ children }) {
 
     // Scheduling: bucket = 'recurring' (keyed by weekday 0-6) or 'oneOff' (date)
     const scheduleWorkout = (bucket, key, workoutId) => setMovement(prev => {
-      const sched = { recurring: { ...(prev.schedule?.recurring || {}) }, oneOff: { ...(prev.schedule?.oneOff || {}) } };
+      const sched = cloneSched(prev.schedule);
       const cur = sched[bucket][key] || [];
       if (!cur.includes(workoutId)) sched[bucket][key] = [...cur, workoutId];
       return { ...prev, schedule: sched };
     });
     const unscheduleWorkout = (bucket, key, workoutId) => setMovement(prev => {
-      const sched = { recurring: { ...(prev.schedule?.recurring || {}) }, oneOff: { ...(prev.schedule?.oneOff || {}) } };
+      const sched = cloneSched(prev.schedule);
       sched[bucket][key] = (sched[bucket][key] || []).filter(id => id !== workoutId);
+      return { ...prev, schedule: sched };
+    });
+
+    // ── Per-occurrence scheduling (Google-Calendar-style) ───────────────────
+    // Full clone of the schedule, guaranteeing all four sub-maps exist.
+    const cloneSched = (s) => ({
+      recurring: { ...((s && s.recurring) || {}) },
+      oneOff: { ...((s && s.oneOff) || {}) },
+      skips: { ...((s && s.skips) || {}) },
+      until: { ...((s && s.until) || {}) },
+    });
+
+    // Remove just one occurrence of a recurring workout (this day only).
+    const skipOccurrence = (dateK, workoutId) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      const cur = sched.skips[dateK] || [];
+      if (!cur.includes(workoutId)) sched.skips[dateK] = [...cur, workoutId];
+      return { ...prev, schedule: sched };
+    });
+
+    // End a recurring series from a date onward (this & all future weeks).
+    const endRecurrence = (dow, workoutId, untilK) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      sched.until[`${dow}:${workoutId}`] = untilK;
+      return { ...prev, schedule: sched };
+    });
+
+    // Delete a recurring series entirely, clearing its end-date and any skips
+    // for that workout on the same weekday so a future re-add starts clean.
+    const removeRecurrence = (dow, workoutId) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      sched.recurring[dow] = (sched.recurring[dow] || []).filter(id => id !== workoutId);
+      delete sched.until[`${dow}:${workoutId}`];
+      for (const dk of Object.keys(sched.skips)) {
+        if (new Date(dk + 'T12:00:00').getDay() !== Number(dow)) continue;
+        const left = (sched.skips[dk] || []).filter(id => id !== workoutId);
+        if (left.length) sched.skips[dk] = left; else delete sched.skips[dk];
+      }
+      return { ...prev, schedule: sched };
+    });
+
+    // Move a single occurrence to another date without touching the series:
+    // a recurring instance becomes a skip on its origin + a one-off on the
+    // target; a one-off just relocates. item = { bucket, key, dk, id }.
+    const moveOccurrence = (item, destDateK) => setMovement(prev => {
+      const sched = cloneSched(prev.schedule);
+      if (item.bucket === 'recurring') {
+        const cur = sched.skips[item.dk] || [];
+        if (!cur.includes(item.id)) sched.skips[item.dk] = [...cur, item.id];
+      } else {
+        const left = (sched.oneOff[item.key] || []).filter(id => id !== item.id);
+        if (left.length) sched.oneOff[item.key] = left; else delete sched.oneOff[item.key];
+      }
+      const dcur = sched.oneOff[destDateK] || [];
+      if (!dcur.includes(item.id)) sched.oneOff[destDateK] = [...dcur, item.id];
       return { ...prev, schedule: sched };
     });
 
@@ -312,6 +367,7 @@ export function AppStateProvider({ children }) {
       movement: mv,
       saveExercise, deleteExercise, saveWorkout, deleteWorkout,
       scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
+      skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence,
       reflection: refl, setDayIntent, setDayEvening,
       deepwork: dw, startSession, endSession,
       firstUse,

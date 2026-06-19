@@ -9,24 +9,30 @@ import { ACCENT, EmptyHint } from './ui.jsx';
 // (every week, by weekday) or one-time (a specific date). Add via the day's +,
 // drag a chip to another day to move it, tap × to remove. Page weeks with ‹ ›.
 export function WeeklySchedule({ workouts, onCreateWorkout }) {
-  const { movement, scheduleWorkout, unscheduleWorkout } = useApp();
-  const sched = movement.schedule || { recurring: {}, oneOff: {} };
+  const { movement, scheduleWorkout, unscheduleWorkout, moveOccurrence, skipOccurrence, endRecurrence, removeRecurrence } = useApp();
+  const sched = movement.schedule || { recurring: {}, oneOff: {}, skips: {}, until: {} };
   const wkById = Object.fromEntries(workouts.map(w => [w.id, w]));
 
   const [weekOffset, setWeekOffset] = React.useState(0);
-  const [adding, setAdding] = React.useState(null); // { dayIndex, date, dow }
-  const [drag, setDrag] = React.useState(null);     // floating chip while dragging
+  const [adding, setAdding] = React.useState(null);   // { dayIndex, date, dow }
+  const [removing, setRemoving] = React.useState(null); // { item, day } — recurring removal sheet
+  const [drag, setDrag] = React.useState(null);       // floating chip while dragging
   const [overDay, setOverDay] = React.useState(null);
   const dragRef = React.useRef(null); dragRef.current = drag;
 
   const ws = addDays(weekStart(new Date()), weekOffset * 7);
   const todayKeyStr = dateKey(new Date());
+  const until = sched.until || {};
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(ws, i);
     const dow = date.getDay();
-    const recurring = (sched.recurring[String(dow)] || []).map(id => ({ id, bucket: 'recurring', key: String(dow) }));
-    const oneOff = (sched.oneOff[dateKey(date)] || []).map(id => ({ id, bucket: 'oneOff', key: dateKey(date) }));
-    return { i, date, dow, dk: dateKey(date), items: [...recurring, ...oneOff] };
+    const dk = dateKey(date);
+    const skips = (sched.skips && sched.skips[dk]) || [];
+    const recurring = (sched.recurring[String(dow)] || [])
+      .filter(id => !skips.includes(id) && !(until[`${dow}:${id}`] && dk > until[`${dow}:${id}`]))
+      .map(id => ({ id, bucket: 'recurring', key: String(dow), dk }));
+    const oneOff = (sched.oneOff[dk] || []).map(id => ({ id, bucket: 'oneOff', key: dk, dk }));
+    return { i, date, dow, dk, items: [...recurring, ...oneOff] };
   });
 
   // ── Chip drag (pointer) ─────────────────────────────────────────────────────
@@ -42,14 +48,11 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
     const up = () => {
       const d = dragRef.current;
       const target = overDay != null ? days[overDay] : null;
-      if (d && target && !(d.bucket === 'recurring' ? target.dow === Number(d.key) : target.dk === d.key)) {
-        if (d.bucket === 'recurring') {
-          unscheduleWorkout('recurring', d.key, d.workoutId);
-          scheduleWorkout('recurring', String(target.dow), d.workoutId);
-        } else {
-          unscheduleWorkout('oneOff', d.key, d.workoutId);
-          scheduleWorkout('oneOff', target.dk, d.workoutId);
-        }
+      // Moving an instance affects only that day — a recurring occurrence becomes
+      // a one-off on the new day and is skipped on its original day; the weekly
+      // series is untouched.
+      if (d && target && target.dk !== d.dk) {
+        moveOccurrence({ bucket: d.bucket, key: d.key, dk: d.dk, id: d.workoutId }, target.dk);
       }
       setDrag(null); setOverDay(null);
     };
@@ -61,7 +64,7 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
     };
-  }, [drag, overDay, days, scheduleWorkout, unscheduleWorkout]);
+  }, [drag, overDay, days, moveOccurrence]);
 
   const startDrag = (e, item, workoutId) => {
     setDrag({ ...item, workoutId, x: e.clientX, y: e.clientY });
@@ -116,9 +119,13 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
                       padding: '6px 10px', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600,
                       opacity: isDragging ? 0.4 : 1,
                     }}>
-                    {item.bucket === 'recurring' && <span title="every week" style={{ color: ACCENT, fontSize: 11 }}>↻</span>}
+                    {item.bucket === 'recurring' && <span title="repeats weekly" style={{ color: ACCENT, fontSize: 11 }}>↻</span>}
                     {w.name}
-                    <button onClick={(e) => { e.stopPropagation(); unscheduleWorkout(item.bucket, item.key, item.id); }}
+                    <button onClick={(e) => {
+                      e.stopPropagation();
+                      if (item.bucket === 'recurring') setRemoving({ item, day });
+                      else unscheduleWorkout('oneOff', item.key, item.id);
+                    }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
                   </span>
                 );
@@ -129,7 +136,7 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
       })}
 
       <p style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, textAlign: 'center', marginTop: 6, lineHeight: 1.5 }}>
-        ↻ repeats weekly · drag a workout to move it · tap × to remove
+        ↻ repeats weekly · drag to move just that day · tap × to remove
       </p>
 
       {/* Floating drag chip */}
@@ -156,6 +163,55 @@ export function WeeklySchedule({ workouts, onCreateWorkout }) {
           }}
         />
       )}
+
+      {/* Remove a recurring occurrence — this day / this & future / every week */}
+      {removing && (
+        <RemoveOccurrence
+          removing={removing}
+          workoutName={wkById[removing.item.id]?.name || 'workout'}
+          onClose={() => setRemoving(null)}
+          onThisDay={() => { skipOccurrence(removing.item.dk, removing.item.id); setRemoving(null); }}
+          onThisAndFuture={() => {
+            const dayBefore = dateKey(addDays(removing.day.date, -1));
+            endRecurrence(String(removing.day.dow), removing.item.id, dayBefore);
+            setRemoving(null);
+          }}
+          onEveryWeek={() => { removeRecurrence(String(removing.day.dow), removing.item.id); setRemoving(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Action sheet for removing a recurring workout occurrence, mirroring how a
+// calendar asks whether to delete one event or the whole series.
+function RemoveOccurrence({ removing, workoutName, onClose, onThisDay, onThisAndFuture, onEveryWeek }) {
+  const dateLabel = removing.day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const rows = [
+    { label: 'This day only', sub: dateLabel, onClick: onThisDay },
+    { label: 'This & future weeks', sub: `Every ${DAY_LABELS[removing.day.dow]} from here on`, onClick: onThisAndFuture },
+    { label: 'Every week', sub: 'Remove the whole repeat', onClick: onEveryWeek, danger: true },
+  ];
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(40px + var(--safe-bottom))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><div style={{ width: 36, height: 4, borderRadius: 999, background: T.border }} /></div>
+        <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Remove “{workoutName}”</div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 16 }}>This repeats weekly — what would you like to remove?</div>
+
+        {rows.map((r, i) => (
+          <button key={i} onClick={r.onClick} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, width: '100%',
+            padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left',
+            background: T.cardCream, border: `0.5px solid ${r.danger ? '#B8453E55' : T.border}`, borderRadius: 12,
+          }}>
+            <span style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: r.danger ? '#B8453E' : T.ink }}>{r.label}</span>
+            <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{r.sub}</span>
+          </button>
+        ))}
+
+        <button onClick={onClose} style={{ width: '100%', padding: '12px', marginTop: 4, background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Cancel</button>
+      </div>
     </div>
   );
 }
