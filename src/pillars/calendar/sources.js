@@ -15,6 +15,8 @@ import { PILLAR_COLORS } from '../../theme/tokens.js';
 import { scheduledFor } from '../movement/model.js';
 import { isActiveDay } from '../routine/model.js';
 import { expandEvent, parseDT, DEFAULT_EVENT_COLOR, TASK_COLOR } from './model.js';
+import { billOccurrences, billStatus, billTitle, DEFAULT_BILL_COLOR } from './bills.js';
+import { todayKey } from '../../lib/dates.js';
 
 function eachDay(start, end, fn) {
   for (let d = startOfDay(start); d <= end; d = addDays(d, 1)) fn(new Date(d));
@@ -136,6 +138,27 @@ function subscriptionsAdapter(app, start, end) {
   return out;
 }
 
+// ── Bills & payments ─────────────────────────────────────────────────────────
+function billsAdapter(app, start, end) {
+  const tk = todayKey();
+  const out = [];
+  for (const b of (app.bills || [])) {
+    for (const due of billOccurrences(b, start, end)) {
+      const dk = dateKey(due);
+      const status = billStatus(b, dk, tk);
+      out.push({
+        id: `bill-${b.id}-${dk}`, sourceId: 'bills', kind: 'bill',
+        title: billTitle(b, dk),
+        date: dk, allDay: true, start: null, end: null,
+        color: b.color || DEFAULT_BILL_COLOR, editable: false,
+        done: status === 'paid',
+        ref: { type: 'bill', billId: b.id, amount: b.amount, autopay: !!b.autopay, status, dueKey: dk, remind: b.remind },
+      });
+    }
+  }
+  return out;
+}
+
 // The registry. `always: true` sources can't be toggled off.
 export const CAL_SOURCES = [
   { id: 'events', label: 'Events', color: DEFAULT_EVENT_COLOR, adapter: eventsAdapter, always: true },
@@ -143,6 +166,7 @@ export const CAL_SOURCES = [
   { id: 'movement', label: 'Workouts', color: PILLAR_COLORS.movement, adapter: movementAdapter },
   { id: 'routine', label: 'Routines', color: PILLAR_COLORS.routine, adapter: routineAdapter },
   { id: 'subscriptions', label: 'Subscribed calendars', color: '#5C6B6B', adapter: subscriptionsAdapter },
+  { id: 'bills', label: 'Bills & payments', color: DEFAULT_BILL_COLOR, adapter: billsAdapter },
   // Future: { id: 'reading', ... }, { id: 'macros', ... }
 ];
 

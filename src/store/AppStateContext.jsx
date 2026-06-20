@@ -4,6 +4,7 @@ import { todayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
 import { MOVEMENT_SEED, uid, ruleId } from '../pillars/movement/model.js';
 import { CAL_SEED, uid as calUid } from '../pillars/calendar/model.js';
+import { uid as billUid } from '../pillars/calendar/bills.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useCloudSync } from '../lib/cloudSync.js';
 
@@ -57,6 +58,7 @@ export function AppStateProvider({ children }) {
   // Fetched external-calendar events (read-only). Per-device, NOT synced — each
   // device re-fetches from the source; only the subscription list itself syncs.
   const [calCache, setCalCache] = usePersistentState('intent.calCache', {});
+  const [bills, setBills] = usePersistentState('intent.bills', []);
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -67,7 +69,7 @@ export function AppStateProvider({ children }) {
 
   // ── Cloud sync (optional) ───────────────────────────────────────────────────
   // The full app state as one document. Last-write-wins across devices.
-  const snapshot = { settings, coffee, books, routines, movement, reflection, calendar, deepwork, firstUse };
+  const snapshot = { settings, coffee, books, routines, movement, reflection, calendar, bills, deepwork, firstUse };
   const hydrate = React.useCallback((data) => {
     if (!data || typeof data !== 'object') return;
     if (data.settings) setSettings(data.settings);
@@ -77,9 +79,10 @@ export function AppStateProvider({ children }) {
     if (data.movement) setMovement(data.movement);
     if (data.reflection) setReflection(data.reflection);
     if (data.calendar) setCalendar(data.calendar);
+    if (data.bills) setBills(data.bills);
     if (data.deepwork) setDeepwork(data.deepwork);
     if (data.firstUse) setFirstUse(data.firstUse);
-  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setReflection, setCalendar, setDeepwork, setFirstUse]);
+  }, [setSettings, setCoffee, setBooks, setRoutines, setMovement, setReflection, setCalendar, setBills, setDeepwork, setFirstUse]);
   const sync = useCloudSync(snapshot, hydrate);
 
   const value = useMemo(() => {
@@ -408,11 +411,33 @@ export function AppStateProvider({ children }) {
     };
     const setSubCache = (id, data) => setCalCache(prev => ({ ...prev, [id]: data }));
 
+    // Bills & payments ------------------------------------------------------
+    const saveBill = (b) => setBills(prev => {
+      const list = prev || [];
+      if (b.id && list.some(x => x.id === b.id)) return list.map(x => x.id === b.id ? { ...x, ...b } : x);
+      return [...list, { ...b, id: b.id || billUid('bill'), paid: b.paid || {} }];
+    });
+    const deleteBill = (id) => setBills(prev => (prev || []).filter(b => b.id !== id));
+    const toggleBillPaid = (id, dk) => setBills(prev => (prev || []).map(b => {
+      if (b.id !== id) return b;
+      const paid = { ...(b.paid || {}) };
+      if (paid[dk]) delete paid[dk]; else paid[dk] = true;
+      return { ...b, paid };
+    }));
+    // Record a payment: value = true (paid, amount unknown), a number (actual
+    // amount), or null (unmark).
+    const setBillPaidAmount = (id, dk, value) => setBills(prev => (prev || []).map(b => {
+      if (b.id !== id) return b;
+      const paid = { ...(b.paid || {}) };
+      if (value == null) delete paid[dk]; else paid[dk] = value === true ? true : (Number(value) || true);
+      return { ...b, paid };
+    }));
+
     // Data -------------------------------------------------------------------
     const exportData = () => {
       const payload = {
         exportedAt: new Date().toISOString(),
-        settings, coffee, books, routines, movement, reflection, calendar, deepwork,
+        settings, coffee, books, routines, movement, reflection, calendar, bills, deepwork,
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -434,6 +459,7 @@ export function AppStateProvider({ children }) {
       if (payload.movement) { setMovement(payload.movement); restored.push('movement'); }
       if (payload.reflection) { setReflection(payload.reflection); restored.push('reflection'); }
       if (payload.calendar) { setCalendar(payload.calendar); restored.push('calendar'); }
+      if (payload.bills) { setBills(payload.bills); restored.push('bills'); }
       if (payload.deepwork) { setDeepwork(payload.deepwork); restored.push('deep work'); }
       if (!restored.length) return { ok: false, error: 'No Intent data found in that file.' };
       return { ok: true, restored };
@@ -458,12 +484,13 @@ export function AppStateProvider({ children }) {
       reflection: refl, setDayIntent, setDayEvening,
       calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
       addSubscription, updateSubscription, removeSubscription, setSubCache,
+      bills, saveBill, deleteBill, toggleBillPaid, setBillPaidAmount,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, importData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, movement, reflection, calendar, calCache, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, reflection, calendar, calCache, bills, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

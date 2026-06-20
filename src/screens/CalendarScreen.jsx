@@ -10,6 +10,7 @@ import {
 } from '../pillars/calendar/model.js';
 import { itemsForRange, itemsForDate, inboxTasks, CAL_SOURCES } from '../pillars/calendar/sources.js';
 import { CalendarComposer } from '../pillars/calendar/CalendarComposer.jsx';
+import { BillsManager } from '../pillars/calendar/BillsScreen.jsx';
 import { refreshSubscriptions } from '../lib/icsSync.js';
 import { EVENT_COLORS } from '../pillars/calendar/model.js';
 
@@ -29,6 +30,7 @@ export function CalendarScreen() {
   const [cursor, setCursor] = React.useState(() => new Date());
   const [composer, setComposer] = React.useState(null);
   const [optionsOpen, setOptionsOpen] = React.useState(false);
+  const [billsView, setBillsView] = React.useState(null); // null | {} | { bill, occurrenceKey }
   const now = new Date();
 
   // Pull read-only external calendars on open (throttled inside refreshSubscriptions).
@@ -49,6 +51,10 @@ export function CalendarScreen() {
     else if (it.kind === 'task') setComposer({ mode: 'task', task: it.ref, date: it.date });
     else if (it.kind === 'workout') navigateToPillar('movement');
     else if (it.kind === 'routine') navigateToPillar('routine', it.ref.id);
+    else if (it.kind === 'bill') {
+      const bill = (app.bills || []).find(b => b.id === it.ref.billId);
+      if (bill) setBillsView({ ...bill, occurrenceKey: it.ref.dueKey });
+    }
   };
 
   const weekSun = addDays(cursor, -cursor.getDay());
@@ -114,7 +120,8 @@ export function CalendarScreen() {
       }}>+</button>
 
       {composer && <CalendarComposer composer={composer} onClose={() => setComposer(null)} />}
-      {optionsOpen && <OptionsSheet app={app} onClose={() => setOptionsOpen(false)} setCalendarLayer={setCalendarLayer} />}
+      {optionsOpen && <OptionsSheet app={app} onClose={() => setOptionsOpen(false)} setCalendarLayer={setCalendarLayer} onBills={() => { setOptionsOpen(false); setBillsView('list'); }} />}
+      {billsView && <BillsManager onClose={() => setBillsView(null)} initialEdit={typeof billsView === 'object' ? billsView : null} />}
     </div>
   );
 }
@@ -235,17 +242,17 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
       {allDay.length > 0 && (
         <div style={{ padding: '8px 0 10px', borderBottom: `0.5px solid ${T.border}`, marginBottom: 4 }}>
           {allDay.map(it => (
-            <button key={it.id} onClick={() => onItem(it)} style={{
+            <div key={it.id} onClick={() => onItem(it)} style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-              padding: '7px 10px', marginBottom: 4, cursor: 'pointer', borderRadius: 8, border: 'none',
+              padding: '7px 10px', marginBottom: 4, cursor: 'pointer', borderRadius: 8,
               background: `${it.color}1F`,
             }}>
               {it.kind === 'task'
                 ? <Check done={it.done} color={it.color} />
                 : <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, flexShrink: 0 }} />}
               <span style={{ flex: 1, fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.ink, textDecoration: it.done ? 'line-through' : 'none', opacity: it.done ? 0.5 : 1 }}>{it.title}</span>
-              <KindTag kind={it.kind} />
-            </button>
+              <KindTag kind={it.kind} item={it} />
+            </div>
           ))}
         </div>
       )}
@@ -513,7 +520,7 @@ function AgendaView({ app, cursor, now, onItem, onToggle }) {
                     <span style={{ width: 64, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{it.allDay ? 'all-day' : fmtTime(it.start)}</span>
                     <span style={{ flex: 1, fontFamily: T.fontSans, fontSize: 14, color: T.ink, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</span>
                     {it.ref?.remind != null && <Bell />}
-                    <KindTag kind={it.kind} />
+                    <KindTag kind={it.kind} item={it} />
                   </button>
                 )
             ))}
@@ -557,14 +564,19 @@ function Bell() {
   );
 }
 
-function KindTag({ kind }) {
+const BILL_TAG = { paid: { l: 'Paid', c: '#5A8A5A' }, auto: { l: 'Auto', c: '#7A8C7E' }, due: { l: 'Due', c: '#B8893E' }, overdue: { l: 'Overdue', c: '#B8453E' }, upcoming: { l: 'Bill', c: T.muted } };
+function KindTag({ kind, item }) {
   if (kind === 'event' || kind === 'task') return null;
+  if (kind === 'bill') {
+    const s = BILL_TAG[item?.ref?.status] || BILL_TAG.upcoming;
+    return <span style={{ fontFamily: T.fontSans, fontSize: 9, fontWeight: 700, color: '#fff', background: s.c, borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>{s.l}</span>;
+  }
   const label = kind === 'workout' ? 'Workout' : kind === 'routine' ? 'Routine' : kind === 'sub' ? 'Synced' : kind;
   return <span style={{ fontFamily: T.fontSans, fontSize: 9, fontWeight: 600, color: T.muted, background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>{label}</span>;
 }
 
 // ── Options sheet (layers + export + sync note) ──────────────────────────────
-function OptionsSheet({ app, onClose, setCalendarLayer }) {
+function OptionsSheet({ app, onClose, setCalendarLayer, onBills }) {
   const layers = (app.calendar?.settings?.layers) || {};
   const exportICS = () => {
     const ics = buildICS(app.calendar?.events || []);
@@ -599,6 +611,15 @@ function OptionsSheet({ app, onClose, setCalendarLayer }) {
             </div>
           );
         })}
+
+        <button onClick={onBills} style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+          background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12, padding: '13px 14px', marginTop: 16, cursor: 'pointer',
+        }}>
+          <span style={{ fontSize: 16 }}>💳</span>
+          <span style={{ flex: 1, fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>Bills &amp; payments</span>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M5 2l5 5-5 5" stroke={T.muted} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
 
         {/* Subscribed read-only calendars (Google / Apple / any .ics) */}
         <Subscriptions app={app} />
