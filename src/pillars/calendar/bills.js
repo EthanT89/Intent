@@ -209,6 +209,17 @@ export function overdueOccurrences(bills, today = new Date(), lookbackDays = 95)
   return out;
 }
 
+// The earliest unpaid occurrence of a manual bill (overdue first, else next
+// upcoming) as a date key, or null. Drives the quick "mark paid" in the list.
+export function nextUnpaid(bill, today = new Date(), lookbackDays = 95, lookaheadDays = 400) {
+  if (bill.autopay) return null;
+  for (const due of billOccurrences(bill, addDays(today, -lookbackDays), addDays(today, lookaheadDays))) {
+    const dk = dateKey(due);
+    if (!isPaid(bill, dk)) return dk;
+  }
+  return null;
+}
+
 // Recorded payments for a bill, newest first: { date, amount|null }.
 export function paymentHistory(bill, limit = 24) {
   const paid = bill.paid || {};

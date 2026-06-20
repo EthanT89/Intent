@@ -21,7 +21,7 @@ const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-export function CalendarScreen() {
+export function CalendarScreen({ intent, onConsumeIntent } = {}) {
   const app = useApp();
   const { calendar, setCalendarView, setCalendarLayer, toggleTask } = app;
   const { navigateToPillar } = useUI();
@@ -38,6 +38,11 @@ export function CalendarScreen() {
     const subs = calendar.settings?.subscriptions || [];
     if (subs.length) refreshSubscriptions(subs, app.calCache, app.setSubCache);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Honor a cross-screen request to open the bills manager (from Today's card).
+  React.useEffect(() => {
+    if (intent === 'bills') { setBillsView('list'); onConsumeIntent && onConsumeIntent(); }
+  }, [intent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeView = (v) => { setView(v); setCalendarView(v); };
   const shift = (dir) => {

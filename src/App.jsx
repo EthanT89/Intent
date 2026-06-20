@@ -128,6 +128,7 @@ export default function App() {
   const [pillarArg, setPillarArg] = React.useState(null); // optional focus payload for a Section
   const [statsDrill, setStatsDrill] = React.useState(null);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [calIntent, setCalIntent] = React.useState(null); // e.g. 'bills' — what to auto-open on the Calendar
   const scrollRef = React.useRef(null);
 
   // Streak milestone celebration — fires once when the active streak crosses a
@@ -193,6 +194,7 @@ export default function App() {
     navigateToPillar,
     goToTab: goTab,
     openSettings: () => setSettingsOpen(true),
+    openBills: () => { goTab('calendar'); setCalIntent('bills'); },
     openPullModal: (recipe) => { if (recipe) setPrefillRecipe(recipe); setPullModalOpen(true); },
     openRecipeModal: () => setRecipeModalOpen(true),
     viewRecipe: (r) => setViewingRecipe(r),
@@ -307,7 +309,7 @@ export default function App() {
         {/* Calendar — full-height, manages its own scroll + sticky header */}
         {showingCalendar && (
           <div style={{ position: 'absolute', inset: 0, paddingTop: 'calc(var(--safe-top) + 8px)' }}>
-            <CalendarScreen />
+            <CalendarScreen intent={calIntent} onConsumeIntent={() => setCalIntent(null)} />
           </div>
         )}
 

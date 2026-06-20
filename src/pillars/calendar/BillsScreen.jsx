@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { dateKey, todayKey } from '../../lib/dates.js';
 import {
   BILL_FREQS, BILL_COLORS, DEFAULT_BILL_COLOR, presetToRecur, recurToPreset, recurLabel,
-  nextDueDate, billStatus, fmtMoney, monthSummary, paymentHistory,
+  nextDueDate, billStatus, fmtMoney, monthSummary, paymentHistory, nextUnpaid,
 } from './bills.js';
 
 const field = {
@@ -73,12 +73,26 @@ export function BillsManager({ onClose, initialEdit }) {
         const dk = next ? dateKey(next) : null;
         const status = dk ? billStatus(b, dk, tk) : 'upcoming';
         const ss = STATUS_STYLE[status] || STATUS_STYLE.upcoming;
+        const payDk = nextUnpaid(b, now); // earliest unpaid occurrence (manual only)
+        const markPaid = (e) => {
+          e.stopPropagation();
+          if (b.variable) setEditing({ ...b, occurrenceKey: payDk }); // record amount
+          else setBillPaidAmount(b.id, payDk, true);
+        };
         return (
-          <button key={b.id} onClick={() => setEditing(b)} style={{
+          <div key={b.id} onClick={() => setEditing(b)} style={{
             display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
             background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 14, padding: 14, marginBottom: 8, cursor: 'pointer',
           }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: b.color || DEFAULT_BILL_COLOR, flexShrink: 0 }} />
+            {payDk ? (
+              <button onClick={markPaid} title="Mark paid" style={{
+                width: 24, height: 24, flexShrink: 0, borderRadius: '50%', cursor: 'pointer', padding: 0,
+                border: `1.5px solid ${status === 'overdue' ? '#B8453E' : T.border}`, background: 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}><span style={{ width: 8, height: 8, borderRadius: 2, background: b.color || DEFAULT_BILL_COLOR }} /></button>
+            ) : (
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: b.color || DEFAULT_BILL_COLOR, flexShrink: 0 }} />
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.fontSerif, fontSize: 16, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</div>
               <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>
@@ -89,7 +103,7 @@ export function BillsManager({ onClose, initialEdit }) {
               <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{b.variable ? (Number(b.amount) ? `~${fmtMoney(b.amount)}` : 'Varies') : fmtMoney(b.amount)}</div>
               {ss.label && <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: ss.color }}>{ss.label}</div>}
             </div>
-          </button>
+          </div>
         );
       })}
 

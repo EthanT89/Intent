@@ -11,7 +11,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 // overdue, and the next bill due. Tapping opens the calendar.
 export function BillsToday() {
   const { bills } = useApp();
-  const { goToTab } = useUI();
+  const { openBills } = useUI();
   if (!bills || bills.length === 0) return null;
 
   const now = new Date();
@@ -31,7 +31,7 @@ export function BillsToday() {
   const headlineColor = overdue.length ? '#B8453E' : T.ink;
 
   return (
-    <button onClick={() => goToTab('calendar')} style={{
+    <button onClick={openBills} style={{
       display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
       background: T.card, border: `0.5px solid ${overdue.length ? '#B8453E55' : T.border}`, borderRadius: 16,
       padding: '14px 16px', marginBottom: 12,
