@@ -5,6 +5,7 @@ import { useApp } from '../store/AppStateContext.jsx';
 import { useUI } from '../store/uiContext.js';
 import { greetingForNow, longDate, todayKey } from '../lib/dates.js';
 import { MomentumStrip } from '../components/MomentumStrip.jsx';
+import { BillsToday } from '../components/BillsToday.jsx';
 
 // The app's namesake: a single editable line of intent for the day. Tap to edit;
 // saves on blur. Mirrors the Reflection pillar's morning intent for the same day.
@@ -146,6 +147,9 @@ export function TodayScreen() {
 
       {/* Momentum — your consistency at a glance */}
       {visibleCount > 0 && <div {...rise()}><MomentumStrip /></div>}
+
+      {/* Bills — money out at a glance */}
+      <div {...rise()}><BillsToday /></div>
 
       {/* Active pillars (not yet done today) */}
       {activeIds.map(id => {

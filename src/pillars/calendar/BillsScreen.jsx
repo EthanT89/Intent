@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { dateKey, todayKey } from '../../lib/dates.js';
 import {
   BILL_FREQS, BILL_COLORS, DEFAULT_BILL_COLOR, presetToRecur, recurToPreset, recurLabel,
-  nextDueDate, billStatus, fmtMoney, monthlyTotal,
+  nextDueDate, billStatus, fmtMoney, monthSummary, paymentHistory,
 } from './bills.js';
 
 const field = {
@@ -34,7 +34,7 @@ export function BillsManager({ onClose, initialEdit }) {
 
   const sorted = (bills || []).map(b => ({ b, next: nextDueDate(b, now) }))
     .sort((a, c) => (a.next && c.next) ? a.next - c.next : a.next ? -1 : 1);
-  const total = monthlyTotal(bills, now.getFullYear(), now.getMonth());
+  const sum = monthSummary(bills, now.getFullYear(), now.getMonth());
 
   if (editing) {
     // Use the live bill from the store so a just-recorded payment shows at once
@@ -57,7 +57,9 @@ export function BillsManager({ onClose, initialEdit }) {
 
       <h1 style={{ fontFamily: T.fontSerif, fontSize: 26, fontWeight: 600, color: T.ink, marginBottom: 2 }}>Bills & payments</h1>
       <p style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, marginBottom: 18 }}>
-        {bills.length ? `${fmtMoney(total)} due this month` : 'Track what goes out, and when'}
+        {!bills.length ? 'Track what goes out, and when'
+          : sum.dueManual > 0 ? `${fmtMoney(sum.projected)} this month · ${fmtMoney(sum.dueManual)} left to pay`
+            : `${fmtMoney(sum.projected)} this month · all automatic`}
       </p>
 
       {sorted.length === 0 && (
@@ -128,6 +130,7 @@ function BillComposer({ bill, occurrenceKey, onClose, onSave, onDelete, onSetPai
   const occVal = occurrenceKey ? (bill?.paid && bill.paid[occurrenceKey]) : undefined; // true | number | undefined
   const occPaid = !!occVal;
   const showPay = !!occurrenceKey && !(autopay && !variable);
+  const history = bill ? paymentHistory(bill) : [];
 
   return (
     <div className="intent-scroll" style={{ position: 'absolute', inset: 0, zIndex: 420, background: T.bg, overflowY: 'auto', padding: 'calc(var(--safe-top) + 12px) 16px calc(40px + var(--safe-bottom))' }}>
@@ -229,6 +232,18 @@ function BillComposer({ bill, occurrenceKey, onClose, onSave, onDelete, onSetPai
       <input value={account} onChange={e => setAccount(e.target.value)} placeholder="Account / method (optional)" style={{ ...field, marginBottom: 10 }} />
       <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes…" style={{ ...field, height: 56, resize: 'none', marginBottom: 16, lineHeight: 1.5 }} />
 
+      {history.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={labelStyle}>Payment history</div>
+          {history.map(h => (
+            <div key={h.date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 2px', borderBottom: `0.5px solid ${T.border}` }}>
+              <span style={{ fontFamily: T.fontSans, fontSize: 13, color: T.ink }}>{fmtDate(h.date)}</span>
+              <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: h.amount != null ? T.ink : T.muted }}>{h.amount != null ? fmtMoney(h.amount) : 'Paid'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Record this occurrence (when opened from a calendar tap) */}
       {showPay && (
         occPaid ? (
@@ -276,6 +291,10 @@ function Toggle({ on, onChange }) {
       <span style={{ display: 'block', width: 24, height: 24, borderRadius: '50%', background: '#fff', transform: `translateX(${on ? 18 : 0}px)`, transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
     </button>
   );
+}
+
+function fmtDate(dk) {
+  return new Date(`${dk}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function segStyle(active) {

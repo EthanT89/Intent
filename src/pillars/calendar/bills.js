@@ -174,3 +174,46 @@ export function monthlyTotal(bills, year, month) {
   }
   return total;
 }
+
+// Projected vs paid vs still-to-manually-pay for a calendar month. Variable
+// bills count their estimate until an actual amount is recorded.
+export function monthSummary(bills, year, month) {
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0, 23, 59, 59);
+  let projected = 0, paid = 0, dueManual = 0, count = 0;
+  for (const b of (bills || [])) {
+    for (const due of billOccurrences(b, start, end)) {
+      const dk = dateKey(due);
+      const actual = billAmountFor(b, dk);
+      const amt = actual != null ? actual : (Number(b.amount) || 0);
+      projected += amt; count++;
+      if (isPaid(b, dk)) paid += amt;
+      else if (!b.autopay) dueManual += amt;
+    }
+  }
+  return { projected, paid, dueManual, count };
+}
+
+// Past manual bill occurrences that haven't been marked paid.
+export function overdueOccurrences(bills, today = new Date(), lookbackDays = 95) {
+  const start = addDays(today, -lookbackDays);
+  const tk = dateKey(today);
+  const out = [];
+  for (const b of (bills || [])) {
+    if (b.autopay) continue;
+    for (const due of billOccurrences(b, start, today)) {
+      const dk = dateKey(due);
+      if (dk < tk && !isPaid(b, dk)) out.push({ bill: b, dk, amount: Number(b.amount) || 0 });
+    }
+  }
+  return out;
+}
+
+// Recorded payments for a bill, newest first: { date, amount|null }.
+export function paymentHistory(bill, limit = 24) {
+  const paid = bill.paid || {};
+  return Object.keys(paid)
+    .sort((a, b) => (a < b ? 1 : -1))
+    .slice(0, limit)
+    .map(dk => ({ date: dk, amount: typeof paid[dk] === 'number' ? paid[dk] : null }));
+}
