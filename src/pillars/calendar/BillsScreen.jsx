@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { dateKey, todayKey } from '../../lib/dates.js';
 import {
   BILL_FREQS, BILL_COLORS, DEFAULT_BILL_COLOR, presetToRecur, recurToPreset, recurLabel,
-  nextDueDate, billStatus, fmtMoney, monthSummary, paymentHistory, nextUnpaid,
+  nextDueDate, billStatus, fmtMoney, monthSummary, paymentHistory, nextUnpaid, dueUnpaid,
 } from './bills.js';
 
 const field = {
@@ -27,10 +27,13 @@ const STATUS_STYLE = {
 
 // Full-screen bills manager (opened from the calendar options sheet).
 export function BillsManager({ onClose, initialEdit }) {
-  const { bills, saveBill, deleteBill, setBillPaidAmount } = useApp();
+  const { bills, saveBill, deleteBill, setBillPaidAmount, markPaidBatch } = useApp();
   const [editing, setEditing] = React.useState(initialEdit || null); // bill object, {} for new, or null
+  const [confirmSweep, setConfirmSweep] = React.useState(false);
   const tk = todayKey();
   const now = new Date();
+  const due = dueUnpaid(bills, now);
+  const dueSum = due.reduce((a, d) => a + d.amount, 0);
 
   const sorted = (bills || []).map(b => ({ b, next: nextDueDate(b, now) }))
     .sort((a, c) => (a.next && c.next) ? a.next - c.next : a.next ? -1 : 1);
@@ -61,6 +64,18 @@ export function BillsManager({ onClose, initialEdit }) {
           : sum.dueManual > 0 ? `${fmtMoney(sum.projected)} this month · ${fmtMoney(sum.dueManual)} left to pay`
             : `${fmtMoney(sum.projected)} this month · all automatic`}
       </p>
+
+      {due.length > 0 && (
+        <button
+          onClick={() => { if (confirmSweep) { markPaidBatch(due); setConfirmSweep(false); } else { setConfirmSweep(true); setTimeout(() => setConfirmSweep(false), 3500); } }}
+          style={{
+            width: '100%', marginBottom: 14, padding: '12px', borderRadius: 12, cursor: 'pointer',
+            border: `1px solid ${confirmSweep ? '#5A8A5A' : T.border}`, background: confirmSweep ? '#5A8A5A' : T.card,
+            color: confirmSweep ? '#fff' : T.ink, fontFamily: T.fontSans, fontSize: 14, fontWeight: 600,
+          }}>
+          {confirmSweep ? `Tap to confirm — mark ${due.length} paid` : `Mark ${due.length} due as paid · ${fmtMoney(dueSum)}`}
+        </button>
+      )}
 
       {sorted.length === 0 && (
         <div style={{ background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 16, padding: '32px 22px', textAlign: 'center' }}>
@@ -122,6 +137,8 @@ function BillComposer({ bill, occurrenceKey, onClose, onSave, onDelete, onSetPai
   const [amount, setAmount] = React.useState(bill?.amount != null ? String(bill.amount) : '');
   const [variable, setVariable] = React.useState(bill?.variable ?? false);
   const [payAmt, setPayAmt] = React.useState(bill?.amount ? String(bill.amount) : '');
+  const [editHist, setEditHist] = React.useState(null); // history date being corrected
+  const [histAmt, setHistAmt] = React.useState('');
   const [preset, setPreset] = React.useState(recurToPreset(r0));
   const [day, setDay] = React.useState(r0.day || new Date().getDate());
   const [weekday, setWeekday] = React.useState(r0.weekday ?? 1);
@@ -250,9 +267,25 @@ function BillComposer({ bill, occurrenceKey, onClose, onSave, onDelete, onSetPai
         <div style={{ marginBottom: 16 }}>
           <div style={labelStyle}>Payment history</div>
           {history.map(h => (
-            <div key={h.date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 2px', borderBottom: `0.5px solid ${T.border}` }}>
-              <span style={{ fontFamily: T.fontSans, fontSize: 13, color: T.ink }}>{fmtDate(h.date)}</span>
-              <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: h.amount != null ? T.ink : T.muted }}>{h.amount != null ? fmtMoney(h.amount) : 'Paid'}</span>
+            <div key={h.date} style={{ borderBottom: `0.5px solid ${T.border}` }}>
+              <button onClick={() => { setEditHist(editHist === h.date ? null : h.date); setHistAmt(h.amount != null ? String(h.amount) : ''); }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '9px 2px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontFamily: T.fontSans, fontSize: 13, color: T.ink }}>{fmtDate(h.date)}</span>
+                <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: h.amount != null ? T.ink : T.muted }}>{h.amount != null ? fmtMoney(h.amount) : 'Paid'}</span>
+              </button>
+              {editHist === h.date && (
+                <div style={{ display: 'flex', gap: 8, padding: '2px 0 12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.card, paddingLeft: 12 }}>
+                    <span style={{ fontFamily: T.fontSans, fontSize: 14, color: T.muted }}>$</span>
+                    <input type="number" inputMode="decimal" value={histAmt} onChange={e => setHistAmt(e.target.value)} placeholder="amount"
+                      style={{ ...field, border: 'none', paddingLeft: 6, padding: '9px 0 9px 6px' }} />
+                  </div>
+                  <button onClick={() => { onSetPaid(bill.id, h.date, histAmt ? Number(histAmt) : true); setEditHist(null); }}
+                    style={{ flex: '0 0 auto', padding: '9px 14px', borderRadius: 10, border: 'none', cursor: 'pointer', background: T.amber, color: '#FAF7F2', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600 }}>Save</button>
+                  <button onClick={() => { onSetPaid(bill.id, h.date, null); setEditHist(null); }}
+                    style={{ flex: '0 0 auto', padding: '9px 14px', borderRadius: 10, border: '1px solid #B8453E', cursor: 'pointer', background: 'none', color: '#B8453E', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600 }}>Remove</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

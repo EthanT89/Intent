@@ -432,6 +432,14 @@ export function AppStateProvider({ children }) {
       if (value == null) delete paid[dk]; else paid[dk] = value === true ? true : (Number(value) || true);
       return { ...b, paid };
     }));
+    // Mark many occurrences paid at once (the "pay all due" sweep). entries: [{id, dk}].
+    const markPaidBatch = (entries) => setBills(prev => (prev || []).map(b => {
+      const mine = (entries || []).filter(e => e.id === b.id);
+      if (!mine.length) return b;
+      const paid = { ...(b.paid || {}) };
+      mine.forEach(e => { paid[e.dk] = true; });
+      return { ...b, paid };
+    }));
 
     // Data -------------------------------------------------------------------
     const exportData = () => {
@@ -484,7 +492,7 @@ export function AppStateProvider({ children }) {
       reflection: refl, setDayIntent, setDayEvening,
       calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
       addSubscription, updateSubscription, removeSubscription, setSubCache,
-      bills, saveBill, deleteBill, toggleBillPaid, setBillPaidAmount,
+      bills, saveBill, deleteBill, toggleBillPaid, setBillPaidAmount, markPaidBatch,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, importData, eraseAllData,

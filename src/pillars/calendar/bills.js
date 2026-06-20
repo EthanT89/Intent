@@ -220,6 +220,22 @@ export function nextUnpaid(bill, today = new Date(), lookbackDays = 95, lookahea
   return null;
 }
 
+// Unpaid, on-or-before-today occurrences of fixed manual bills — what a
+// "mark all due as paid" sweep would clear. (Variable bills need an amount, so
+// they're excluded.) Returns [{ id, dk, name, amount }].
+export function dueUnpaid(bills, today = new Date(), lookbackDays = 95) {
+  const tk = dateKey(today);
+  const out = [];
+  for (const b of (bills || [])) {
+    if (b.autopay || b.variable) continue;
+    for (const due of billOccurrences(b, addDays(today, -lookbackDays), today)) {
+      const dk = dateKey(due);
+      if (dk <= tk && !isPaid(b, dk)) out.push({ id: b.id, dk, name: b.name, amount: Number(b.amount) || 0 });
+    }
+  }
+  return out;
+}
+
 // Recorded payments for a bill, newest first: { date, amount|null }.
 export function paymentHistory(bill, limit = 24) {
   const paid = bill.paid || {};
