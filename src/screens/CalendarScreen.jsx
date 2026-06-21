@@ -74,6 +74,22 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
     else setCursor(c => addDays(c, dir));
   };
 
+  // Horizontal swipe navigates the period (prev/next). Only fires when the
+  // gesture is clearly horizontal, so it never steals vertical scroll or the
+  // day-grid's drag-to-move.
+  const swipe = React.useRef(null);
+  const onTouchStart = (e) => {
+    if (e.touches.length !== 1) { swipe.current = null; return; }
+    swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e) => {
+    const s = swipe.current; swipe.current = null;
+    if (!s) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.8) shift(dx < 0 ? 1 : -1);
+  };
+
   const openItem = (it) => {
     if (it.kind === 'event') setComposer({ mode: 'event', event: it.ref, date: it.date });
     else if (it.kind === 'task') setComposer({ mode: 'task', task: it.ref, date: it.date });
@@ -132,8 +148,8 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
       </div>
 
       {/* Body */}
-      <div ref={bodyRef} className="intent-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
-        <div key={view} className="cal-fade">
+      <div ref={bodyRef} className="intent-scroll" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
+        <div key={`${view}:${dateKey(cursor)}`} className="cal-fade">
           {view === 'day' && <DayView app={app} cursor={cursor} now={now} onItem={openItem} onCreate={(h) => setComposer({ mode: 'event', date: dateKey(cursor), startHour: h })} />}
           {view === 'week' && <WeekView app={app} cursor={cursor} now={now} onItem={openItem} onPickDay={(d) => { setCursor(d); changeView('day'); }} onCreate={(d, h) => setComposer({ mode: 'event', date: dateKey(d), startHour: h })} />}
           {view === 'month' && <MonthView app={app} cursor={cursor} now={now} onPickDay={(d) => { setCursor(d); changeView('day'); }} />}
