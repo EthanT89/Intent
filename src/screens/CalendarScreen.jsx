@@ -49,9 +49,9 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
   const bodyRef = React.useRef(null);
   const now = new Date();
 
-  // Switching to month/week/agenda should start at the top (Day manages its own
-  // scroll-to-now). Runs after Day's child effect, so only touch non-day views.
-  React.useEffect(() => { if (view !== 'day' && bodyRef.current) bodyRef.current.scrollTop = 0; }, [view]);
+  // Month/agenda start at the top. Day and Week manage their own scroll-to-now,
+  // so leave those alone (this runs after their child effects).
+  React.useEffect(() => { if ((view === 'month' || view === 'agenda') && bodyRef.current) bodyRef.current.scrollTop = 0; }, [view]);
 
   // Pull read-only external calendars on open (throttled inside refreshSubscriptions).
   React.useEffect(() => {
@@ -363,8 +363,14 @@ function WeekView({ app, cursor, now, onItem, onPickDay, onCreate }) {
   const byDate = {};
   all.forEach(it => { (byDate[it.date] = byDate[it.date] || []).push(it); });
 
+  // Scroll the week to ~now (when this week holds today) or 7am, on the real
+  // scroller (the calendar body, not this inner div).
+  const weekHasToday = days.some(d => isSameDay(d, now));
   React.useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = (7 * 60 / 60) * HOUR;
+    const sc = scrollRef.current && scrollRef.current.closest('.intent-scroll');
+    if (!sc) return;
+    const focusMin = weekHasToday ? minutesOf(now) - 60 : 7 * 60;
+    sc.scrollTop = Math.max(0, (focusMin / 60) * HOUR);
   }, [dateKey(sunday)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const colLeft = (d, sub, cols) => `calc(${GUTTER}px + (100% - ${GUTTER}px) * ${d / 7} + ((100% - ${GUTTER}px) / 7) * ${sub / cols})`;
