@@ -42,6 +42,10 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'always',
     backgroundColor: '#E8E0D4',
+    // Capacitor 8 defaults to Swift Package Manager; we use CocoaPods so the
+    // build produces App.xcworkspace (the CI .ipa build expects it) and the
+    // capacitor-calendar pod integrates cleanly.
+    packageManager: 'CocoaPods',
   },
   android: {
     backgroundColor: '#E8E0D4',
