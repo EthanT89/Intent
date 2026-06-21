@@ -93,8 +93,10 @@ export async function pushState(data, { signal } = {}) {
  *
  * Strategy: last-write-wins by timestamp. On load, pull; if the remote copy is
  * newer than what we last synced locally, hydrate from it. Thereafter, push
- * (debounced) whenever the state changes. Offline-safe: failures set a status
- * and the next change retries.
+ * (debounced) whenever the state changes — but each push first re-checks the
+ * remote and, if it has moved ahead of our last sync (another device or an
+ * external write to the store), hydrates that instead of overwriting it
+ * (compare-before-push). Offline-safe: failures set a status and retry.
  */
 export function useCloudSync(snapshot, hydrate) {
   const [status, setStatus] = React.useState(syncEnabled ? 'connecting' : 'disabled');
@@ -105,6 +107,29 @@ export function useCloudSync(snapshot, hydrate) {
   const lastSyncedStr = React.useRef('');     // serialized form of last-synced state
   const hydrateRef = React.useRef(hydrate);
   hydrateRef.current = hydrate;
+
+  // Compare-before-push: never overwrite a remote version newer than the one this
+  // device last synced. If the server moved ahead (another device, or an external
+  // write to the store — e.g. Claude managing the data), adopt that instead of
+  // pushing over it. Normal case: remote == our last sync, so we just push.
+  const guardedPush = React.useCallback(async (snap, snapSerialized) => {
+    const remote = await pullState();
+    const localTs = localStorage.getItem(META_KEY);
+    if (remote && (!localTs || remote.updatedAt > localTs)) {
+      applyingRef.current = true;                 // suppress the echo-push after hydrate
+      hydrateRef.current(remote.data);
+      lastSyncedStr.current = stableStringify(remote.data);
+      localStorage.setItem(META_KEY, remote.updatedAt);
+      setLastSyncedAt(remote.updatedAt);
+      setTimeout(() => { applyingRef.current = false; }, 0);
+      return 'hydrated';
+    }
+    const { updatedAt } = await pushState(snap);
+    lastSyncedStr.current = snapSerialized;
+    localStorage.setItem(META_KEY, updatedAt);
+    setLastSyncedAt(updatedAt);
+    return 'pushed';
+  }, []);
 
   const snapStr = stableStringify(snapshot);
 
@@ -147,10 +172,7 @@ export function useCloudSync(snapshot, hydrate) {
     const id = setTimeout(async () => {
       setStatus('syncing');
       try {
-        const { updatedAt } = await pushState(snapshot);
-        lastSyncedStr.current = snapStr;
-        localStorage.setItem(META_KEY, updatedAt);
-        setLastSyncedAt(updatedAt);
+        await guardedPush(snapshot, snapStr);
         setStatus('synced');
       } catch (e) {
         setStatus(navigator.onLine ? 'error' : 'offline');
@@ -164,15 +186,12 @@ export function useCloudSync(snapshot, hydrate) {
     if (!syncEnabled) return;
     setStatus('syncing');
     try {
-      const { updatedAt } = await pushState(snapshot);
-      lastSyncedStr.current = stableStringify(snapshot);
-      localStorage.setItem(META_KEY, updatedAt);
-      setLastSyncedAt(updatedAt);
+      await guardedPush(snapshot, stableStringify(snapshot));
       setStatus('synced');
     } catch (e) {
       setStatus(navigator.onLine ? 'error' : 'offline');
     }
-  }, [snapStr]);
+  }, [snapStr, guardedPush]);
 
   return { status, lastSyncedAt, syncNow, enabled: syncEnabled };
 }
