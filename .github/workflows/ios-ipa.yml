@@ -51,7 +51,8 @@ jobs:
         # whichever the OS version needs is present (avoids a permission crash).
         run: |
           PLIST=ios/App/App/Info.plist
-          MSG="Intent shows your phone's calendars (including work calendars) alongside your plans. Read-only."
+          # No apostrophes/quotes/parens — PlistBuddy reads them as quote tokens.
+          MSG="Intent displays your device calendars alongside your plans. Read-only."
           for KEY in NSCalendarsUsageDescription NSCalendarsFullAccessUsageDescription NSCalendarsReadOnlyAccessUsageDescription NSCalendarsWriteOnlyAccessUsageDescription; do
             /usr/libexec/PlistBuddy -c "Add :$KEY string $MSG" "$PLIST" 2>/dev/null \
               || /usr/libexec/PlistBuddy -c "Set :$KEY $MSG" "$PLIST"
