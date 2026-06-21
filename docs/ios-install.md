@@ -71,3 +71,24 @@ launch (same as the PWA) and updates instantly on every `git push` — no rebuil
 ### Which should you use?
 - **Just want it on your phone, hassle-free** → Option 1 (PWA).
 - **Want a real App-Library app and don't mind the weekly refresh** → Option 2.
+
+---
+
+## Device calendar (full work-calendar details)
+
+Web/ICS calendar sharing can't see a work calendar's event **details** when the
+org restricts external sharing to free/busy (e.g. Roblox Workspace). The native
+build gets around this by reading the **phone's own calendars** via EventKit —
+the OS is already logged in, so it has full access.
+
+Requirements & steps:
+1. The Roblox (or any) account must be added to the **iOS system Calendar**
+   (Settings → Calendar → Accounts → Add Account → Google) so events show in the
+   stock Apple Calendar app. (The Google Calendar app's own sandbox is *not*
+   readable — it must be a system account.)
+2. Use **Option 2** (the native .ipa) — this only works in the installed native
+   app, not the Safari PWA. Rebuilding via the GitHub Action injects the calendar
+   permission strings automatically.
+3. In Intent: **Calendar → ⋯ → Device calendar → Connect**, approve the calendar
+   access prompt, then pick which device calendars to show. Events appear as a
+   read-only "Phone" layer. Refresh re-reads them.

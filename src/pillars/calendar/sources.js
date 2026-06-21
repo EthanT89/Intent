@@ -159,6 +159,29 @@ function billsAdapter(app, start, end) {
   return out;
 }
 
+// ── Device (native) calendars — read from the phone's own calendars ──────────
+// Events are pre-fetched + cached (concrete occurrences) by lib/deviceCalendar.js;
+// here we just emit the ones in range. Read-only.
+function deviceAdapter(app, start, end) {
+  const dc = app.deviceCal;
+  if (!dc || dc.enabled === false) return [];
+  const out = [];
+  for (const ev of (dc.events || [])) {
+    const s = parseDT(ev.start);
+    if (!s || s < start || s > end) continue;
+    out.push({
+      id: ev.id, sourceId: 'device', kind: 'device',
+      title: ev.title || '(busy)', date: dateKey(s),
+      allDay: !!ev.allDay,
+      start: ev.allDay ? null : s,
+      end: ev.allDay ? null : (parseDT(ev.end) || s),
+      color: '#5C6B6B', editable: false,
+      ref: { type: 'device' }, notes: ev.notes, location: ev.location,
+    });
+  }
+  return out;
+}
+
 // The registry. `always: true` sources can't be toggled off.
 export const CAL_SOURCES = [
   { id: 'events', label: 'Events', color: DEFAULT_EVENT_COLOR, adapter: eventsAdapter, always: true },
@@ -167,6 +190,7 @@ export const CAL_SOURCES = [
   { id: 'routine', label: 'Routines', color: PILLAR_COLORS.routine, adapter: routineAdapter },
   { id: 'subscriptions', label: 'Subscribed calendars', color: '#5C6B6B', adapter: subscriptionsAdapter },
   { id: 'bills', label: 'Bills & payments', color: DEFAULT_BILL_COLOR, adapter: billsAdapter },
+  { id: 'device', label: 'Device calendar', color: '#5C6B6B', adapter: deviceAdapter },
   // Future: { id: 'reading', ... }, { id: 'macros', ... }
 ];
 

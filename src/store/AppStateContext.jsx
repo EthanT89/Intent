@@ -59,6 +59,9 @@ export function AppStateProvider({ children }) {
   // device re-fetches from the source; only the subscription list itself syncs.
   const [calCache, setCalCache] = usePersistentState('intent.calCache', {});
   const [bills, setBills] = usePersistentState('intent.bills', []);
+  // Native device-calendar mirror (read-only, per-device, NOT synced — it's the
+  // OS's own calendar data, re-read on each device).
+  const [deviceCal, setDeviceCal] = usePersistentState('intent.deviceCal', { enabled: false, calendarIds: [], events: [], fetchedAt: null, error: null });
   const [deepwork, setDeepwork] = usePersistentState('intent.deepwork', {
     state: 'idle', startedAt: null, day: todayKey(), lastSession: null, sessions: [],
   });
@@ -493,12 +496,13 @@ export function AppStateProvider({ children }) {
       calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
       addSubscription, updateSubscription, removeSubscription, setSubCache,
       bills, saveBill, deleteBill, toggleBillPaid, setBillPaidAmount, markPaidBatch,
+      deviceCal, setDeviceCal,
       deepwork: dw, startSession, endSession,
       firstUse,
       exportData, importData, eraseAllData,
       sync,
     };
-  }, [settings, coffee, books, routines, movement, reflection, calendar, calCache, bills, deepwork, firstUse, sync, celebration]);
+  }, [settings, coffee, books, routines, movement, reflection, calendar, calCache, bills, deviceCal, deepwork, firstUse, sync, celebration]);
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }

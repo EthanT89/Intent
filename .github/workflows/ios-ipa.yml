@@ -36,6 +36,19 @@ jobs:
           npx cap add ios
           npx cap sync ios
 
+      - name: Add calendar usage descriptions to Info.plist
+        # Required for @ebarooni/capacitor-calendar (EventKit). ios/ is regenerated
+        # above, so the keys must be injected here each build. Add the full set so
+        # whichever the OS version needs is present (avoids a permission crash).
+        run: |
+          PLIST=ios/App/App/Info.plist
+          MSG="Intent shows your phone's calendars (including work calendars) alongside your plans. Read-only."
+          for KEY in NSCalendarsUsageDescription NSCalendarsFullAccessUsageDescription NSCalendarsReadOnlyAccessUsageDescription NSCalendarsWriteOnlyAccessUsageDescription; do
+            /usr/libexec/PlistBuddy -c "Add :$KEY string $MSG" "$PLIST" 2>/dev/null \
+              || /usr/libexec/PlistBuddy -c "Set :$KEY $MSG" "$PLIST"
+          done
+          /usr/libexec/PlistBuddy -c "Print :NSCalendarsFullAccessUsageDescription" "$PLIST"
+
       - name: Build unsigned .ipa
         run: |
           set -eo pipefail

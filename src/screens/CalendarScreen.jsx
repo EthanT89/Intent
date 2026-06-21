@@ -12,7 +12,22 @@ import { itemsForRange, itemsForDate, inboxTasks, CAL_SOURCES } from '../pillars
 import { CalendarComposer } from '../pillars/calendar/CalendarComposer.jsx';
 import { BillsManager } from '../pillars/calendar/BillsScreen.jsx';
 import { refreshSubscriptions } from '../lib/icsSync.js';
+import { deviceCalSupported, ensureReadAccess, listDeviceCalendars, fetchDeviceEvents } from '../lib/deviceCalendar.js';
 import { EVENT_COLORS } from '../pillars/calendar/model.js';
+
+const DEVICE_WINDOW = { back: 45, fwd: 120 }; // days of device events to cache
+
+// Re-read the phone's calendars into the cache (best-effort, native only).
+async function syncDeviceCal(app, { force = false } = {}) {
+  if (!deviceCalSupported()) return;
+  const dc = app.deviceCal || {};
+  if (!dc.enabled) return;
+  if (!force && dc.fetchedAt && Date.now() - new Date(dc.fetchedAt).getTime() < 15 * 60 * 1000) return;
+  const from = addDays(new Date(), -DEVICE_WINDOW.back);
+  const to = addDays(new Date(), DEVICE_WINDOW.fwd);
+  const events = await fetchDeviceEvents(from, to, dc.calendarIds);
+  app.setDeviceCal({ ...dc, events, fetchedAt: new Date().toISOString(), error: null });
+}
 
 const HOUR = 52;   // px per hour in the day grid
 const GUTTER = 46; // left time-label gutter
@@ -43,6 +58,9 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
   React.useEffect(() => {
     if (intent === 'bills') { setBillsView('list'); onConsumeIntent && onConsumeIntent(); }
   }, [intent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pull device (native) calendars on open (native only; throttled; no-op on web).
+  React.useEffect(() => { syncDeviceCal(app); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeView = (v) => { setView(v); setCalendarView(v); };
   const shift = (dir) => {
@@ -576,7 +594,7 @@ function KindTag({ kind, item }) {
     const s = BILL_TAG[item?.ref?.status] || BILL_TAG.upcoming;
     return <span style={{ fontFamily: T.fontSans, fontSize: 9, fontWeight: 700, color: '#fff', background: s.c, borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>{s.l}</span>;
   }
-  const label = kind === 'workout' ? 'Workout' : kind === 'routine' ? 'Routine' : kind === 'sub' ? 'Synced' : kind;
+  const label = kind === 'workout' ? 'Workout' : kind === 'routine' ? 'Routine' : kind === 'sub' ? 'Synced' : kind === 'device' ? 'Phone' : kind;
   return <span style={{ fontFamily: T.fontSans, fontSize: 9, fontWeight: 600, color: T.muted, background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 999, padding: '2px 7px', flexShrink: 0 }}>{label}</span>;
 }
 
@@ -626,6 +644,9 @@ function OptionsSheet({ app, onClose, setCalendarLayer, onBills }) {
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M5 2l5 5-5 5" stroke={T.muted} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
 
+        {/* Device (native) calendars — full details from the phone */}
+        <DeviceCalendars app={app} />
+
         {/* Subscribed read-only calendars (Google / Apple / any .ics) */}
         <Subscriptions app={app} />
 
@@ -633,6 +654,84 @@ function OptionsSheet({ app, onClose, setCalendarLayer, onBills }) {
           Export my events (.ics)
         </button>
       </div>
+    </div>
+  );
+}
+
+function DeviceCalendars({ app }) {
+  const supported = deviceCalSupported();
+  const dc = app.deviceCal || { enabled: false, calendarIds: [], events: [] };
+  const [cals, setCals] = React.useState([]);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (supported && dc.enabled) listDeviceCalendars().then(setCals);
+  }, [supported, dc.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!supported) {
+    return (
+      <div style={{ marginTop: 22 }}>
+        <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Device calendar</div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, lineHeight: 1.6 }}>
+          Reads your phone's own calendars — including work calendars that block web sharing — with full event details. Available in the installed app on your phone.
+        </div>
+      </div>
+    );
+  }
+
+  const refetch = async (ids) => {
+    const from = addDays(new Date(), -DEVICE_WINDOW.back), to = addDays(new Date(), DEVICE_WINDOW.fwd);
+    return fetchDeviceEvents(from, to, ids);
+  };
+  const enable = async () => {
+    setBusy(true);
+    const res = await ensureReadAccess();
+    if (res !== 'granted') {
+      app.setDeviceCal({ ...dc, enabled: false, error: res === 'denied' ? 'Calendar access denied — enable it in Settings' : 'Could not access calendars' });
+      setBusy(false); return;
+    }
+    const list = await listDeviceCalendars(); setCals(list);
+    const ids = list.map((c) => c.id);
+    app.setDeviceCal({ enabled: true, calendarIds: ids, events: await refetch(ids), fetchedAt: new Date().toISOString(), error: null });
+    setBusy(false);
+  };
+  const toggleCal = async (id) => {
+    const ids = dc.calendarIds.includes(id) ? dc.calendarIds.filter((x) => x !== id) : [...dc.calendarIds, id];
+    setBusy(true);
+    app.setDeviceCal({ ...dc, calendarIds: ids, events: await refetch(ids), fetchedAt: new Date().toISOString() });
+    setBusy(false);
+  };
+  const refresh = async () => { setBusy(true); const events = await refetch(dc.calendarIds); app.setDeviceCal({ ...dc, events, fetchedAt: new Date().toISOString(), error: null }); setBusy(false); };
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Device calendar</span>
+        {dc.enabled
+          ? <button onClick={refresh} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.amber, fontFamily: T.fontSans, fontSize: 12, fontWeight: 600 }}>{busy ? 'Syncing…' : 'Refresh'}</button>
+          : <button onClick={enable} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.amber, fontFamily: T.fontSans, fontSize: 12, fontWeight: 600 }}>{busy ? 'Connecting…' : 'Connect'}</button>}
+      </div>
+
+      {dc.error && <div style={{ fontFamily: T.fontSans, fontSize: 12, color: '#B8453E', marginBottom: 8 }}>{dc.error}</div>}
+
+      {dc.enabled && (
+        <>
+          <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 8 }}>{(dc.events || []).length} events from your phone</div>
+          {cals.map((c) => {
+            const on = dc.calendarIds.includes(c.id);
+            return (
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 2px', borderBottom: `0.5px solid ${T.border}` }}>
+                <span style={{ width: 12, height: 12, borderRadius: 3, background: c.color || '#5C6B6B', flexShrink: 0 }} />
+                <span style={{ flex: 1, fontFamily: T.fontSans, fontSize: 14, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</span>
+                <button onClick={() => toggleCal(c.id)} style={{ width: 40, height: 24, borderRadius: 999, border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0, background: on ? T.amber : T.border }}>
+                  <span style={{ display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', transform: `translateX(${on ? 16 : 0}px)`, transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                </button>
+              </div>
+            );
+          })}
+          <button onClick={() => app.setDeviceCal({ ...dc, enabled: false })} style={{ width: '100%', marginTop: 10, padding: '10px', background: 'none', border: `1px solid ${T.border}`, borderRadius: 10, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.muted }}>Turn off device calendar</button>
+        </>
+      )}
     </div>
   );
 }
