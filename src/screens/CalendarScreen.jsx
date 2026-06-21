@@ -46,7 +46,12 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
   const [composer, setComposer] = React.useState(null);
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const [billsView, setBillsView] = React.useState(null); // null | {} | { bill, occurrenceKey }
+  const bodyRef = React.useRef(null);
   const now = new Date();
+
+  // Switching to month/week/agenda should start at the top (Day manages its own
+  // scroll-to-now). Runs after Day's child effect, so only touch non-day views.
+  React.useEffect(() => { if (view !== 'day' && bodyRef.current) bodyRef.current.scrollTop = 0; }, [view]);
 
   // Pull read-only external calendars on open (throttled inside refreshSubscriptions).
   React.useEffect(() => {
@@ -127,11 +132,13 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
       </div>
 
       {/* Body */}
-      <div className="intent-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
-        {view === 'day' && <DayView app={app} cursor={cursor} now={now} onItem={openItem} onCreate={(h) => setComposer({ mode: 'event', date: dateKey(cursor), startHour: h })} />}
-        {view === 'week' && <WeekView app={app} cursor={cursor} now={now} onItem={openItem} onPickDay={(d) => { setCursor(d); changeView('day'); }} onCreate={(d, h) => setComposer({ mode: 'event', date: dateKey(d), startHour: h })} />}
-        {view === 'month' && <MonthView app={app} cursor={cursor} now={now} onPickDay={(d) => { setCursor(d); changeView('day'); }} />}
-        {view === 'agenda' && <AgendaView app={app} cursor={cursor} now={now} onItem={openItem} onToggle={toggleTask} />}
+      <div ref={bodyRef} className="intent-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
+        <div key={view} className="cal-fade">
+          {view === 'day' && <DayView app={app} cursor={cursor} now={now} onItem={openItem} onCreate={(h) => setComposer({ mode: 'event', date: dateKey(cursor), startHour: h })} />}
+          {view === 'week' && <WeekView app={app} cursor={cursor} now={now} onItem={openItem} onPickDay={(d) => { setCursor(d); changeView('day'); }} onCreate={(d, h) => setComposer({ mode: 'event', date: dateKey(d), startHour: h })} />}
+          {view === 'month' && <MonthView app={app} cursor={cursor} now={now} onPickDay={(d) => { setCursor(d); changeView('day'); }} />}
+          {view === 'agenda' && <AgendaView app={app} cursor={cursor} now={now} onItem={openItem} onToggle={toggleTask} />}
+        </div>
       </div>
 
       {/* FAB */}
@@ -195,11 +202,13 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
   const laid = layoutTimed(timed.map(it => ({ ...it, start: it._s, end: it._e })));
   const isToday = isSameDay(cursor, now);
 
-  // Auto-scroll to ~7am (or now) when the day changes.
+  // Auto-scroll the day grid to ~now (or 7am) when the day changes. The actual
+  // scroller is the calendar body (.intent-scroll), not this inner div.
   React.useEffect(() => {
-    if (!scrollRef.current) return;
+    const sc = scrollRef.current && scrollRef.current.closest('.intent-scroll');
+    if (!sc) return;
     const focusMin = isToday ? minutesOf(now) - 60 : 7 * 60;
-    scrollRef.current.scrollTop = Math.max(0, (focusMin / 60) * HOUR);
+    sc.scrollTop = Math.max(0, (focusMin / 60) * HOUR);
   }, [dateKey(cursor)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gridClick = (e) => {
@@ -303,7 +312,8 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
             const widthCalc = dr ? `calc(100% - ${GUTTER + 6}px)` : `calc((100% - ${GUTTER + 6}px) / ${it.cols} - 3px)`;
             const leftCalc = `calc(${GUTTER}px + (100% - ${GUTTER + 6}px) * ${leftPct})`;
             const draggable = it.kind === 'event';
-            const tLabel = `${fmtTime(new Date(0, 0, 0, Math.floor(sMin / 60), sMin % 60))}`;
+            const fmtMin = (m) => fmtTime(new Date(0, 0, 0, Math.floor(m / 60), m % 60));
+            const tLabel = `${fmtMin(sMin)} – ${fmtMin(eMin)}`;
             return (
               <div key={it.id}
                 onPointerDown={draggable ? (e) => startDrag(e, it, 'move') : undefined}
@@ -318,7 +328,8 @@ function DayView({ app, cursor, now, onItem, onCreate }) {
                   zIndex: dr ? 20 : 1, boxShadow: dr ? '0 6px 18px rgba(44,36,24,0.22)' : 'none',
                 }}>
                 <span style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.ink, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: it.done ? 'line-through' : 'none' }}>{it.title}</span>
-                {(height > 30 || dr) && <span style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted }}>{tLabel}</span>}
+                {(height > 30 || dr) && <span style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tLabel}</span>}
+                {height > 52 && it.location && <span style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.location}</span>}
                 {draggable && (
                   <span onPointerDown={(e) => startDrag(e, it, 'resize')} style={{
                     position: 'absolute', left: 0, right: 0, bottom: 0, height: 12, cursor: 'ns-resize', touchAction: 'none',

@@ -43,6 +43,11 @@ input, textarea { font-family: 'DM Sans', system-ui, sans-serif; }
 @keyframes libio-spin { to { transform: rotate(360deg); } }
 .libio-spinner { animation: libio-spin 0.7s linear infinite; }
 
+/* Gentle fade when the calendar switches views (day/week/month/agenda). */
+@keyframes cal-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.cal-fade { animation: cal-fade 0.18s ease both; }
+@media (prefers-reduced-motion: reduce) { .cal-fade { animation: none; } }
+
 @keyframes confetti-fall {
   0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
   100% { opacity: 0; transform: translateY(900px) rotate(540deg); }
