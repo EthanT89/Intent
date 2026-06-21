@@ -327,6 +327,15 @@ export default function App() {
           </div>
         )}
 
+        {/* Soft scrim so scrolling content fades out under the floating tab bar
+            instead of being hard-cut. Sits above content, below the FAB + pill. */}
+        {!showingLibio && !showingSettingsPage && (
+          <div aria-hidden style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, zIndex: 40,
+            pointerEvents: 'none', background: `linear-gradient(to top, ${T.bg} 36%, ${T.bg}00)`,
+          }} />
+        )}
+
         {/* Intent tab bar — hidden while inside Libio or full-page Settings */}
         {!showingLibio && !showingSettingsPage && <TabBar active={tab} onChange={goTab} />}
 
