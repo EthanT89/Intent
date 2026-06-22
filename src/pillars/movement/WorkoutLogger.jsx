@@ -1,7 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { kindOf, FIELD_META } from './model.js';
+import { kindOf, FIELD_META, epley1RM, bestE1RM } from './model.js';
 import { usePointerSort, arrayMove } from './dnd.js';
 import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
@@ -40,6 +40,11 @@ export function WorkoutLogger({ workout, onClose }) {
   // "Last time" per exercise — shown as a hint and used to prefill.
   const lastByEx = {};
   (workout.items || []).forEach(it => { lastByEx[it.exerciseId] = lastEntryFor(sessions, it.exerciseId); });
+
+  // All-time best estimated 1RM per exercise (from past sessions only), so a set
+  // that beats it can light up as a PR while you log.
+  const bestByEx = {};
+  (workout.items || []).forEach(it => { bestByEx[it.exerciseId] = bestE1RM(sessions, it.exerciseId); });
 
   // Seed entries: prefer what you did last time, falling back to the template.
   const [entries, setEntries] = React.useState(() => (workout.items || []).map(it => {
@@ -134,14 +139,19 @@ export function WorkoutLogger({ workout, onClose }) {
 
             {k.perSet ? (
               <div>
-                {e.sets.map((s, si) => (
+                {e.sets.map((s, si) => {
+                  const isPR = k.fields.includes('weight') && bestByEx[e.exerciseId] > 0
+                    && epley1RM(s.weight, s.reps) > bestByEx[e.exerciseId] + 0.01;
+                  return (
                   <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ width: 22, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted, fontWeight: 600 }}>{si + 1}</span>
                     {k.fields.includes('weight') && <NumberField label="Weight" unit="lb" step={5} value={s.weight} onChange={v => patchSet(i, si, { weight: v })} />}
                     {k.fields.includes('reps') && <NumberField label="Reps" step={1} value={s.reps} onChange={v => patchSet(i, si, { reps: v })} />}
+                    {isPR && <span title="New estimated 1-rep-max best" style={{ flexShrink: 0, alignSelf: 'flex-end', marginBottom: 8, fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: '#FAF7F2', background: T.amber, padding: '4px 7px', borderRadius: 999, letterSpacing: '0.04em' }}>PR</span>}
                     <button onClick={() => removeSet(i, si)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0, alignSelf: 'flex-end', marginBottom: 8 }}>×</button>
                   </div>
-                ))}
+                  );
+                })}
                 <button onClick={() => addSet(i)} style={{ width: '100%', padding: '8px', background: 'transparent', border: `1px dashed ${T.border}`, borderRadius: 9, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: ACCENT }}>+ Add set</button>
               </div>
             ) : (

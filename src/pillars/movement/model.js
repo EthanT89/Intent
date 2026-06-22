@@ -94,6 +94,32 @@ export function scheduledFor(schedule, d = new Date()) {
   return [...new Set([...oneOff, ...recurring])];
 }
 
+// Estimated one-rep max (Epley): weight × (1 + reps/30). The standard way to
+// compare sets of different weight×reps for progressive overload. 0 if not a
+// valid weighted set.
+export function epley1RM(weight, reps) {
+  const w = Number(weight) || 0, r = Number(reps) || 0;
+  if (w <= 0 || r <= 0) return 0;
+  return w * (1 + r / 30);
+}
+
+// Best estimated 1RM ever recorded for an exercise across past sessions
+// (optionally excluding one session). Drives the live PR flag while logging.
+export function bestE1RM(sessions, exerciseId, excludeSessionId = null) {
+  let best = 0;
+  for (const s of (sessions || [])) {
+    if (excludeSessionId && s.id === excludeSessionId) continue;
+    for (const e of (s.entries || [])) {
+      if (e.exerciseId !== exerciseId) continue;
+      for (const set of (e.sets || [])) {
+        const v = epley1RM(set.weight, set.reps);
+        if (v > best) best = v;
+      }
+    }
+  }
+  return best;
+}
+
 // One session's total volume (Σ weight × reps across all sets).
 export function sessionVolume(session) {
   let vol = 0;
