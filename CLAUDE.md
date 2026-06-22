@@ -58,6 +58,13 @@ The point of the app, in his words: **live with intention.** Concretely that mea
 - **Tabs:** Today · Calendar · Stats (bottom bar in `src/components/primitives.jsx`).
 - **Calendar:** `src/pillars/calendar/` (model, sources registry, screen, composer,
   bills, ICS parse/sync). Views: Day (drag/resize), Week, Month, Agenda.
+- **The "intent day" (6am cutoff):** consistency runs **6am→6am**, not midnight —
+  `intentNow()` / `intentTodayKey()` in `src/lib/dates.js`. Anything logged before
+  6am counts for the day that's wrapping up (read past 1am, a forgotten workout, a
+  routine checked at 12:30). **All logging writes + momentum/streaks use the intent
+  day; the calendar & bills stay midnight-based** (they plan forward). When you add a
+  "logged today / honored today" check, anchor it on `intentTodayKey()`/`intentNow()`,
+  not `todayKey()`/`new Date()`, or the reader won't match its writer in the grace window.
 - **Theme tokens:** `src/theme/tokens.js` (`T`, `applyTheme`, palettes).
 - **Sync / push / ICS clients:** `src/lib/cloudSync.js`, `src/lib/push.js`,
   `src/lib/icsSync.js`. Sync is **disabled in dev** so the preview never touches
