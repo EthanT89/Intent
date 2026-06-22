@@ -259,6 +259,11 @@ export default function App() {
     screen = <StatsScreen onDrillDown={goStatsDrill} />;
   }
 
+  // Sub-screens (a pillar Section, a stats drill-down, full-page Settings) get a
+  // gentle slide-up entrance; base tabs keep their own feel (Today self-animates).
+  const isSubScreen = !!(pillarPage || statsDrill || showingSettingsPage);
+  const navKey = showingSettingsPage ? 'settings' : pillarPage ? `p:${pillarPage}` : statsDrill ? `s:${statsDrill}` : `t:${tab}`;
+
   const basePad = 'calc(var(--safe-top) + 12px)';
   const titleBarPad = 'calc(var(--safe-top) + 70px)';
   const paddingTop = showTitleBar && !pillarPage && !statsDrill ? titleBarPad : basePad;
@@ -323,7 +328,9 @@ export default function App() {
               WebkitOverflowScrolling: 'touch',
             }}
           >
-            {screen}
+            {isSubScreen
+              ? <div key={navKey} className="screen-rise">{screen}</div>
+              : screen}
           </div>
         )}
 

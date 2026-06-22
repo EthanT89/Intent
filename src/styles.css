@@ -57,3 +57,9 @@ input, textarea { font-family: 'DM Sans', system-ui, sans-serif; }
 @keyframes t-rise { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
 .t-rise { animation: t-rise 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .t-rise { animation: none; } }
+
+/* Slide-up + fade when a pillar Section or stats drill-down opens, so entering
+   a sub-screen feels intentional rather than a hard snap. */
+@keyframes screen-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.screen-rise { animation: screen-rise 0.26s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .screen-rise { animation: none; } }
