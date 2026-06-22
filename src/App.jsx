@@ -8,6 +8,7 @@ import { activeStreak, highestMilestone } from './lib/momentum.js';
 import { StreakCelebration } from './components/StreakCelebration.jsx';
 import { refreshPush, prefsFromSettings } from './lib/push.js';
 import { UIContext } from './store/uiContext.js';
+import { haptics } from './lib/haptics.js';
 import { TodayScreen } from './screens/TodayScreen.jsx';
 import { StatsScreen } from './screens/StatsScreen.jsx';
 import { CalendarScreen } from './screens/CalendarScreen.jsx';
@@ -168,6 +169,13 @@ export default function App() {
   }, [tab, pillarPage, statsDrill]);
 
   const goTab = (newTab) => {
+    haptics.tap();
+    // Tapping the already-active tab at its root scrolls back to the top —
+    // the standard phone shortcut for "take me home in this tab".
+    if (newTab === tab && !pillarPage && !statsDrill) {
+      if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     setPillarPage(null);
     setStatsDrill(null);
     setTab(newTab);
