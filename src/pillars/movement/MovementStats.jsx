@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { SectionHeader } from '../../components/primitives.jsx';
-import { sessionVolume, kindOf } from './model.js';
+import { sessionVolume, kindOf, epley1RM } from './model.js';
 import { weekStart, addDays, isThisMonth, timeAgo } from '../../lib/dates.js';
 import { ACCENT } from './ui.jsx';
 
@@ -35,11 +35,10 @@ export function MovementStats({ onBack }) {
   const prs = {};
   sessions.forEach(s => (s.entries || []).forEach(e => {
     (e.sets || []).forEach(set => {
-      const w = Number(set.weight) || 0, r = Number(set.reps) || 0;
-      if (w <= 0 || r <= 0) return;
-      const e1rm = w * (1 + r / 30);
+      const e1rm = epley1RM(set.weight, set.reps);
+      if (e1rm <= 0) return;
       const cur = prs[e.exerciseId];
-      if (!cur || e1rm > cur.e1rm) prs[e.exerciseId] = { e1rm, weight: w, reps: r, name: e.name || exById[e.exerciseId]?.name || 'Exercise' };
+      if (!cur || e1rm > cur.e1rm) prs[e.exerciseId] = { e1rm, weight: Number(set.weight), reps: Number(set.reps), name: e.name || exById[e.exerciseId]?.name || 'Exercise' };
     });
   }));
   const prList = Object.values(prs).sort((a, b) => b.e1rm - a.e1rm).slice(0, 12);
