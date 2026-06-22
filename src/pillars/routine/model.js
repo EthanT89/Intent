@@ -2,7 +2,7 @@
 // History shape: { [routineId]: { 'YYYY-MM-DD': { [itemId]: bool } } }
 // daysOn uses JS getDay(): 0 = Sun … 6 = Sat
 
-import { dateKey, addDays } from '../../lib/dates.js';
+import { dateKey, addDays, intentNow } from '../../lib/dates.js';
 
 export function isActiveDay(routine, d) {
   return routine.daysOn.includes(d.getDay());
@@ -65,7 +65,7 @@ export function dayCompletionPct(routine, dayMap) {
 
 // Whole-routine streak: walk back from today across days-on.
 // Today only counts if fully complete; an unfinished today doesn't break it.
-export function computeRoutineStreak(routine, history, today = new Date()) {
+export function computeRoutineStreak(routine, history, today = intentNow()) {
   let streak = 0;
   let started = false;
   for (let i = 0; i < 365; i++) {
@@ -81,7 +81,7 @@ export function computeRoutineStreak(routine, history, today = new Date()) {
 }
 
 // Per-item streak — same walk, single item.
-export function computeItemStreak(routine, history, itemId, today = new Date()) {
+export function computeItemStreak(routine, history, itemId, today = intentNow()) {
   let streak = 0;
   let started = false;
   for (let i = 0; i < 365; i++) {
@@ -97,7 +97,7 @@ export function computeItemStreak(routine, history, itemId, today = new Date()) 
 }
 
 // Completion % over the last 30 active days (used on the Stats card).
-export function completionPct30(routine, history, today = new Date()) {
+export function completionPct30(routine, history, today = intentNow()) {
   let activeDays = 0, score = 0;
   for (let i = 0; i < 30; i++) {
     const d = addDays(today, -i);

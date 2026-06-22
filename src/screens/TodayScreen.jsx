@@ -3,7 +3,7 @@ import { T } from '../theme/tokens.js';
 import { PILLAR_MAP } from '../pillars/registry.js';
 import { useApp } from '../store/AppStateContext.jsx';
 import { useUI } from '../store/uiContext.js';
-import { greetingForNow, longDate, todayKey } from '../lib/dates.js';
+import { greetingForNow, longDate, intentTodayKey } from '../lib/dates.js';
 import { MomentumStrip } from '../components/MomentumStrip.jsx';
 import { BillsToday } from '../components/BillsToday.jsx';
 import { TodayAgenda } from '../components/TodayAgenda.jsx';
@@ -12,7 +12,7 @@ import { TodayAgenda } from '../components/TodayAgenda.jsx';
 // saves on blur. Mirrors the Reflection pillar's morning intent for the same day.
 function IntentHeader() {
   const { reflection, setDayIntent } = useApp();
-  const saved = (reflection.days || {})[todayKey()]?.intent || '';
+  const saved = (reflection.days || {})[intentTodayKey()]?.intent || '';
   const [editing, setEditing] = React.useState(false);
   const [text, setText] = React.useState(saved);
   const ref = React.useRef(null);

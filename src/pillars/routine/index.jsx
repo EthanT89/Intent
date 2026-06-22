@@ -1,7 +1,7 @@
 import { PILLAR_COLORS } from '../../theme/tokens.js';
 import { RoutinePill, RoutineSection } from './components.jsx';
 import { computeRoutineStreak, completionPct30, isActiveDay, isDayComplete } from './model.js';
-import { todayKey } from '../../lib/dates.js';
+import { intentNow, intentTodayKey } from '../../lib/dates.js';
 
 export default {
   id: 'routine',
@@ -11,9 +11,9 @@ export default {
   Section: RoutineSection,
   StatsScreen: null, // stub for now
   getDaily(app) {
-    const active = (app.routines.list || []).filter(r => r.disabled !== true && isActiveDay(r, new Date()));
+    const active = (app.routines.list || []).filter(r => r.disabled !== true && isActiveDay(r, intentNow()));
     if (!active.length) return { done: false };
-    const tk = todayKey();
+    const tk = intentTodayKey();
     const done = active.every(r => r.items.length > 0 && isDayComplete(r, (app.routines.history[r.id] || {})[tk]));
     return { done };
   },

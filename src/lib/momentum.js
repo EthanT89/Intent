@@ -3,9 +3,11 @@
 // the Today strip and the Stats heatmap. This is the backbone of persistence:
 // it turns scattered logs into one picture of a life in motion.
 
-import { dateKey, addDays } from './dates.js';
+import { dateKey, addDays, intentNow } from './dates.js';
 
-const dkOf = (iso) => { try { return dateKey(new Date(iso)); } catch { return null; } };
+// Attribute a timestamp to its intent day (rolls over at the 6am cutoff), so a
+// 1am coffee or deep-work session credits the day that's wrapping up.
+const dkOf = (iso) => { try { return dateKey(intentNow(new Date(iso))); } catch { return null; } };
 
 // One check per trackable pillar: did anything happen that day?
 export const HONOR_CHECKS = {
@@ -30,7 +32,7 @@ export function honoredOn(app, dk) {
 }
 
 // Last `days` days (oldest→newest) with honored count + ratio.
-export function momentumSeries(app, days = 14, today = new Date()) {
+export function momentumSeries(app, days = 14, today = intentNow()) {
   const tracked = trackedPillars(app);
   const denom = Math.max(1, tracked.length);
   const out = [];
@@ -45,7 +47,7 @@ export function momentumSeries(app, days = 14, today = new Date()) {
 
 // Consecutive days (ending today, with a grace for an unstarted today) on which
 // at least one tracked pillar was honored.
-export function activeStreak(app, today = new Date()) {
+export function activeStreak(app, today = intentNow()) {
   const tracked = trackedPillars(app);
   if (!tracked.length) return 0;
   const honoredAny = (dk) => tracked.some(id => HONOR_CHECKS[id](app, dk));
@@ -61,7 +63,7 @@ export function activeStreak(app, today = new Date()) {
 }
 
 // Longest honored streak within the last `range` days (for "best" context).
-export function bestStreak(app, range = 180, today = new Date()) {
+export function bestStreak(app, range = 180, today = intentNow()) {
   const tracked = trackedPillars(app);
   if (!tracked.length) return 0;
   const honoredAny = (dk) => tracked.some(id => HONOR_CHECKS[id](app, dk));
@@ -74,7 +76,7 @@ export function bestStreak(app, range = 180, today = new Date()) {
 }
 
 // Per-pillar streak (consecutive days honored, today-grace) — for "most consistent".
-export function pillarStreak(app, id, today = new Date()) {
+export function pillarStreak(app, id, today = intentNow()) {
   const check = HONOR_CHECKS[id];
   if (!check) return 0;
   let streak = 0, started = false;
@@ -99,7 +101,7 @@ export function highestMilestone(streak) {
 }
 
 // A 6-week heatmap grid (rows = weeks, cols = Mon..Sun) for the Stats card.
-export function heatmapWeeks(app, weeks = 6, today = new Date()) {
+export function heatmapWeeks(app, weeks = 6, today = intentNow()) {
   const tracked = trackedPillars(app);
   const denom = Math.max(1, tracked.length);
   // Start on the Monday `weeks-1` weeks ago.

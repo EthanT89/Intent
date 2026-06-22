@@ -2,7 +2,7 @@ import { PILLAR_COLORS } from '../../theme/tokens.js';
 import { ReadingPill } from './ReadingPill.jsx';
 import { LibioApp, LibioStatsScreen, LibioLogSessionSheet } from './LibioApp.jsx';
 import { LIBIO_STATS_DATA } from './data.js';
-import { isThisYear, todayKey } from '../../lib/dates.js';
+import { isThisYear, intentTodayKey } from '../../lib/dates.js';
 
 // Reading is the one pillar that takes over the whole screen (the embedded
 // Libio app) instead of opening an in-shell Section — `fullScreen: true`
@@ -20,7 +20,7 @@ export default {
   LibioLogSessionSheet,
   statsData: LIBIO_STATS_DATA,
   getDaily(app) {
-    const done = (app.books.sessions || []).some(s => s.date === todayKey());
+    const done = (app.books.sessions || []).some(s => s.date === intentTodayKey());
     return { done };
   },
   getStats(app) {

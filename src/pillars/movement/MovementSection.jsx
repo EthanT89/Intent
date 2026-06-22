@@ -9,7 +9,7 @@ import { WorkoutBuilder } from './WorkoutBuilder.jsx';
 import { WorkoutLogger } from './WorkoutLogger.jsx';
 import { WeeklySchedule } from './WeeklySchedule.jsx';
 import { WeightCard } from './WeightCard.jsx';
-import { timeAgo } from '../../lib/dates.js';
+import { timeAgo, intentNow } from '../../lib/dates.js';
 
 export function MovementSection({ onBack }) {
   const app = useApp();
@@ -29,7 +29,7 @@ export function MovementSection({ onBack }) {
   const exercises = movement.exercises || [];
   const sessions = movement.sessions || [];
   const wkById = Object.fromEntries(workouts.map(w => [w.id, w]));
-  const todayWorkouts = scheduledFor(movement.schedule || {}, new Date()).map(id => wkById[id]).filter(Boolean);
+  const todayWorkouts = scheduledFor(movement.schedule || {}, intentNow()).map(id => wkById[id]).filter(Boolean);
 
   return (
     <div style={{ padding: '10px 16px 120px' }}>

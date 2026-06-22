@@ -3,7 +3,7 @@ import { T } from '../theme/tokens.js';
 import { useApp } from '../store/AppStateContext.jsx';
 import { useUI } from '../store/uiContext.js';
 import { momentumSeries, activeStreak, honoredOn, trackedPillars } from '../lib/momentum.js';
-import { todayKey } from '../lib/dates.js';
+import { intentTodayKey } from '../lib/dates.js';
 
 // A quiet "life in motion" strip for Today: the last 14 days as bars (height =
 // how many pillars you honored), plus the current active streak. Tapping opens
@@ -19,7 +19,7 @@ export function MomentumStrip() {
   if (!hasAny) return null;
 
   const streak = activeStreak(app);
-  const todayCount = honoredOn(app, todayKey()).length;
+  const todayCount = honoredOn(app, intentTodayKey()).length;
   const accent = T.amber;
 
   return (

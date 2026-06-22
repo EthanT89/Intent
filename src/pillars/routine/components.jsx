@@ -3,7 +3,7 @@ import { T } from '../../theme/tokens.js';
 import { PillarPill, CategoryLabel, GroupLabel } from '../../components/primitives.jsx';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { useUI } from '../../store/uiContext.js';
-import { dateKey, addDays, todayKey } from '../../lib/dates.js';
+import { dateKey, addDays, intentNow, intentTodayKey, inDayGrace } from '../../lib/dates.js';
 import { haptics } from '../../lib/haptics.js';
 import {
   isActiveDay, dayCompletionPct, computeRoutineStreak, computeItemStreak,
@@ -14,7 +14,7 @@ import {
 export function RoutinePill() {
   const { routines } = useApp();
   const { navigateToPillar } = useUI();
-  const today = new Date();
+  const today = intentNow();
   const all = routines.list || [];
 
   // Empty state — no routines yet
@@ -69,8 +69,17 @@ export function RoutinePill() {
     );
   }
 
-  // Only surface routines whose time-of-day window is open right now.
-  const activeNow = activeToday.filter(r => withinWindow(r, today));
+  // Only surface routines whose time-of-day window is open right now — but
+  // during the post-midnight grace tail (before the 6am cutoff), keep any
+  // still-unfinished routine from the wrapping-up day visible so it can be
+  // caught up on, even though its window has technically passed.
+  const grace = inDayGrace();
+  const tKey = intentTodayKey();
+  const isComplete = (r) => {
+    const map = (routines.history[r.id] || {})[tKey] || {};
+    return r.items.length > 0 && r.items.every(it => map[it.id]);
+  };
+  const activeNow = activeToday.filter(r => withinWindow(r) || (grace && !isComplete(r)));
 
   // In a gap between windows (e.g. afternoon, between a morning and evening
   // routine) — point to what's next, but keep the section a tap away.
@@ -107,7 +116,7 @@ function OneRoutinePill({ routine, today }) {
   const { routines, toggleRoutineItem } = useApp();
   const { navigateToPillar } = useUI();
   const history = routines.history[routine.id] || {};
-  const todayMap = history[todayKey()] || {};
+  const todayMap = history[intentTodayKey()] || {};
   const doneCount = routine.items.filter(it => todayMap[it.id]).length;
   const allDone = routine.items.length > 0 && doneCount === routine.items.length;
   const streak = computeRoutineStreak(routine, history, today);
@@ -279,13 +288,13 @@ export function RoutineSection({ onBack, arg }) {
   const history = routines.history;
   // Focus the routine passed in (from a Today card), else today's active one, else first.
   const initialId = (arg && list.some(r => r.id === arg)) ? arg
-    : (list.find(r => isActiveDay(r, new Date())) || list[0] || {}).id;
+    : (list.find(r => isActiveDay(r, intentNow())) || list[0] || {}).id;
   const [activeId, setActiveId] = React.useState(initialId);
   const [editing, setEditing] = React.useState(false);
   const [stripEndOffset, setStripEndOffset] = React.useState(0);
 
-  const today = new Date();
-  const tKey = todayKey();
+  const today = intentNow();
+  const tKey = intentTodayKey();
   const routine = list.find(r => r.id === activeId);
   React.useEffect(() => {
     if (!routine && list.length > 0) setActiveId(list[0].id);

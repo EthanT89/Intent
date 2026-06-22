@@ -3,7 +3,7 @@ import { PILLAR_COLORS, T } from '../../theme/tokens.js';
 import { PillarPill, CategoryLabel, GhostButton, SectionHeader } from '../../components/primitives.jsx';
 import { useUI } from '../../store/uiContext.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { todayKey, dateKey, addDays } from '../../lib/dates.js';
+import { intentTodayKey, dateKey, addDays } from '../../lib/dates.js';
 import { honoredOn } from '../../lib/momentum.js';
 
 // Local labels (avoid importing the registry — it imports this file back).
@@ -33,7 +33,7 @@ function ReflectionPill() {
   const { navigateToPillar } = useUI();
   const { reflection } = useApp();
   const days = reflection.days || {};
-  const today = days[todayKey()] || {};
+  const today = days[intentTodayKey()] || {};
   const evening = new Date().getHours() >= 17;
 
   let body, cta;
@@ -84,7 +84,7 @@ function ReflectionSection({ onBack }) {
   const app = useApp();
   const { reflection, setDayIntent, setDayEvening } = app;
   const days = reflection.days || {};
-  const tKey = todayKey();
+  const tKey = intentTodayKey();
   const today = days[tKey] || {};
   const evening = new Date().getHours() >= 17;
   const honoredToday = honoredOn(app, tKey).filter(id => id !== 'reflection').map(id => HONOR_LABELS[id]);
@@ -181,7 +181,7 @@ export default {
   Section: ReflectionSection,
   StatsScreen: null,
   getDaily(app) {
-    const d = (app.reflection.days || {})[todayKey()] || {};
+    const d = (app.reflection.days || {})[intentTodayKey()] || {};
     return { done: !!(d.intent && d.evening) };
   },
   getStats(app) {

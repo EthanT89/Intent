@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { usePersistentState, clearAllAppData } from './usePersistentState.js';
-import { todayKey, isThisYear } from '../lib/dates.js';
+import { todayKey, intentTodayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
 import { MOVEMENT_SEED, uid, ruleId } from '../pillars/movement/model.js';
 import { CAL_SEED, uid as calUid } from '../pillars/calendar/model.js';
@@ -113,8 +113,11 @@ export function AppStateProvider({ children }) {
       recipes: [...prev.recipes, { id: Date.now(), ...recipe }],
     }));
 
-    // Deep work — auto-reset to idle each new day (logged sessions persist) --
-    const today = todayKey();
+    // The day all logging writes to. Uses the 6am "intent day" cutoff, so late-
+    // night logs (a routine checked at 12:30am, a forgotten workout) count for
+    // the day that's wrapping up, not the one just begun. Deep-work's daily
+    // timer reset rides this too.
+    const today = intentTodayKey();
     const dw = deepwork.day === today
       ? deepwork
       : { state: 'idle', startedAt: null, day: today, lastSession: null, sessions: deepwork.sessions || [] };

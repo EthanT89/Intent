@@ -6,24 +6,24 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { MovementSection } from './MovementSection.jsx';
 import { MovementStats } from './MovementStats.jsx';
 import { scheduledFor, computeMovementStats } from './model.js';
-import { dateKey, weekStart, addDays } from '../../lib/dates.js';
+import { dateKey, weekStart, addDays, intentNow, intentTodayKey } from '../../lib/dates.js';
 
 function MovementPill() {
   const { navigateToPillar } = useUI();
   const { movement } = useApp();
   const workouts = movement.workouts || [];
   const wkById = Object.fromEntries(workouts.map(w => [w.id, w]));
-  const todayWorkouts = scheduledFor(movement.schedule || {}, new Date()).map(id => wkById[id]).filter(Boolean);
+  const todayWorkouts = scheduledFor(movement.schedule || {}, intentNow()).map(id => wkById[id]).filter(Boolean);
   const sessions = movement.sessions || [];
-  const loggedToday = sessions.some(s => (s.date || dateKey(new Date(s.at))) === dateKey(new Date()));
+  const loggedToday = sessions.some(s => (s.date || dateKey(new Date(s.at))) === intentTodayKey());
 
   // Week dots: which days this week already have a logged session.
-  const ws = weekStart(new Date());
+  const ws = weekStart(intentNow());
   const sessionDays = new Set(sessions.map(s => s.date || dateKey(new Date(s.at))));
   const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((label, i) => ({
     label, done: sessionDays.has(dateKey(addDays(ws, i))),
   }));
-  const todayIndex = (new Date().getDay() + 6) % 7;
+  const todayIndex = (intentNow().getDay() + 6) % 7;
 
   const headline = loggedToday ? 'Workout logged ✓'
     : todayWorkouts.length ? todayWorkouts[0].name
@@ -55,7 +55,7 @@ export default {
   Section: MovementSection,
   StatsScreen: MovementStats,
   getDaily(app) {
-    const tk = dateKey(new Date());
+    const tk = intentTodayKey();
     const done = (app.movement.sessions || []).some(s => (s.date || dateKey(new Date(s.at))) === tk);
     return { done };
   },

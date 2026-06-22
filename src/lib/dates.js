@@ -11,6 +11,32 @@ export function todayKey() {
   return dateKey(new Date());
 }
 
+// A new "intent day" begins at this local hour, not midnight. Anything logged
+// before it counts toward the previous day — so reading past 1am, or a workout
+// you forgot to log before bed, still lands on the day it belonged to. You're
+// not done with a day until you've slept.
+export const DAY_CUTOFF_HOUR = 6;
+
+// True when we're in the post-midnight grace tail of the previous intent day.
+export function inDayGrace(d = new Date()) {
+  return d.getHours() < DAY_CUTOFF_HOUR;
+}
+
+// "Now", shifted so the day rolls over at DAY_CUTOFF_HOUR. Same clock time,
+// dialed back one calendar day during the grace window. Use this as the anchor
+// wherever "which day am I logging / what streak am I on" matters — NOT the
+// calendar, which plans forward and rolls at midnight.
+export function intentNow(d = new Date()) {
+  if (!inDayGrace(d)) return new Date(d);
+  const o = new Date(d);
+  o.setDate(o.getDate() - 1);
+  return o;
+}
+
+export function intentTodayKey() {
+  return dateKey(intentNow());
+}
+
 export function addDays(d, n) {
   const out = new Date(d);
   out.setDate(out.getDate() + n);
