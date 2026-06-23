@@ -11,7 +11,7 @@ import { WeeklySchedule } from './WeeklySchedule.jsx';
 import { WeightCard } from './WeightCard.jsx';
 import { timeAgo, intentNow } from '../../lib/dates.js';
 
-export function MovementSection({ onBack }) {
+export function MovementSection({ onBack, arg }) {
   const app = useApp();
   const { movement } = app;
   const [view, setView] = React.useState('today');
@@ -19,6 +19,15 @@ export function MovementSection({ onBack }) {
   const [editingWorkout, setEditingWorkout] = React.useState(null);
   const [logging, setLogging] = React.useState(null);
   const [pickLog, setPickLog] = React.useState(false);
+
+  // Deep-link from the Today pill's "Log workout": open the logger straight away
+  // for the scheduled workout, or the picker if none is scheduled today.
+  React.useEffect(() => {
+    if (!arg || arg.open !== 'log') return;
+    const wk = arg.workoutId && (movement.workouts || []).find(w => w.id === arg.workoutId);
+    if (wk) setLogging(wk);
+    else if ((movement.workouts || []).length) setPickLog(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sub-screens take over the section.
   if (editingExercise) return <ExerciseEditor exercise={editingExercise} onClose={() => setEditingExercise(null)} />;

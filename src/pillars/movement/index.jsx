@@ -41,6 +41,16 @@ function MovementPill() {
           <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink, marginBottom: 3 }}>{headline}</div>
           <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, marginBottom: 10 }}>{sub}</div>
           <DayPills days={weekDays} todayIndex={todayIndex} />
+          {workouts.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigateToPillar('movement', { open: 'log', workoutId: todayWorkouts[0]?.id || null }); }}
+                style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.pillars.movement, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+              >
+                {todayWorkouts.length ? (loggedToday ? 'Log again' : 'Log workout') : 'Log a workout'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </PillarPill>
