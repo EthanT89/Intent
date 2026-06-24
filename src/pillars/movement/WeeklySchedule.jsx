@@ -1,7 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { DAY_LABELS, ruleId, ruleFreq, ruleActiveOnWeek } from './model.js';
+import { DAY_LABELS, ruleId, ruleFreq, ruleActiveOnWeek, plural } from './model.js';
 import { dateKey, weekStart, addDays } from '../../lib/dates.js';
 import { ACCENT, EmptyHint } from './ui.jsx';
 
@@ -374,7 +374,7 @@ function AddToDay({ day, workouts, onClose, onAdd }) {
               background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
             }}>
               <span style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{w.name}</span>
-              <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{(w.items || []).length} exercises</span>
+              <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</span>
             </button>
           ))}
         </div>

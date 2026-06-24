@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { SectionHeader } from '../../components/primitives.jsx';
-import { scheduledFor, sessionVolume, kindOf } from './model.js';
+import { scheduledFor, sessionVolume, kindOf, plural } from './model.js';
 import { Segmented, Card, PrimaryBtn, EmptyHint, ACCENT } from './ui.jsx';
 import { ExerciseEditor } from './ExerciseEditor.jsx';
 import { WorkoutBuilder } from './WorkoutBuilder.jsx';
@@ -69,7 +69,7 @@ export function MovementSection({ onBack, arg }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
                   <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink }}>{w.name}</div>
-                  <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{(w.items || []).length} exercises</div>
+                  <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</div>
                 </div>
               </div>
               <PrimaryBtn onClick={() => setLogging(w)} color={ACCENT}>Log this workout</PrimaryBtn>
@@ -94,7 +94,7 @@ export function MovementSection({ onBack, arg }) {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                     <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>
-                      {timeAgo(s.at || s.date)} · {doneCount} exercises{s.durationMin ? ` · ${s.durationMin} min` : ''}
+                      {timeAgo(s.at || s.date)} · {plural(doneCount, 'exercise')}{s.durationMin ? ` · ${s.durationMin} min` : ''}
                     </div>
                   </div>
                   {vol > 0 && <div style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink, flexShrink: 0, marginLeft: 10 }}>{vol.toLocaleString()} <span style={{ fontSize: 11, color: T.muted }}>lb</span></div>}
@@ -117,7 +117,7 @@ export function MovementSection({ onBack, arg }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: T.fontSerif, fontSize: 16, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
-                      <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{(w.items || []).length} exercises</div>
+                      <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); setLogging(w); }} style={logBtn}>Log</button>
                   </div>
@@ -169,7 +169,7 @@ export function MovementSection({ onBack, arg }) {
                   background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
                 }}>
                   <span style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{w.name}</span>
-                  <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{(w.items || []).length} exercises</span>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</span>
                 </button>
               ))}
             </div>

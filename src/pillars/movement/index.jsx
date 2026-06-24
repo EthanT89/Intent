@@ -5,7 +5,7 @@ import { useUI } from '../../store/uiContext.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { MovementSection } from './MovementSection.jsx';
 import { MovementStats } from './MovementStats.jsx';
-import { scheduledFor, computeMovementStats } from './model.js';
+import { scheduledFor, computeMovementStats, plural } from './model.js';
 import { dateKey, weekStart, addDays, intentNow, intentTodayKey } from '../../lib/dates.js';
 
 function MovementPill() {
@@ -29,7 +29,7 @@ function MovementPill() {
     : todayWorkouts.length ? todayWorkouts[0].name
     : 'Rest day';
   const sub = loggedToday ? 'Nice work today.'
-    : todayWorkouts.length ? `${(todayWorkouts[0].items || []).length} exercises scheduled`
+    : todayWorkouts.length ? `${plural((todayWorkouts[0].items || []).length, 'exercise')} scheduled`
     : workouts.length ? 'Nothing scheduled today' : 'Tap to build your first workout';
 
   return (

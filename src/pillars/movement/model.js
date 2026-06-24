@@ -47,6 +47,9 @@ export function uid(prefix = 'm') {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 }
 
+// "1 exercise" / "2 exercises" — count with a correctly pluralized noun.
+export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 export function kindOf(id) {
   return EXERCISE_KINDS[id] || EXERCISE_KINDS.strength;
 }
