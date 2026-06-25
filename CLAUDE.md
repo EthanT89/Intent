@@ -40,7 +40,11 @@ The point of the app, in his words: **live with intention.** Concretely that mea
 - **Reading** — sustained reading habit; books across shelves, ratings, saved
   quotes/notes, pace + recommendations.
 - **Routines & reflection** — morning/nighttime routines, daily intent + evening recap,
-  consistency streaks (the momentum engine, `src/lib/momentum.js`).
+  consistency streaks (the momentum engine, `src/lib/momentum.js`). **Routine streaks
+  are intentionally forgiving** — a day counts toward the streak at ≥50% of items done
+  (`dayCountsForStreak` / `STREAK_MIN_PCT` in `routine/model.js`), so forgetting one item
+  never wipes the streak. Don't "fix" this back to all-or-nothing; full completion (the ✓)
+  is a separate concept from streak-credit.
 - **Calendar as the hub** — plan + see everything in one timeline (events, tasks,
   workouts, routines, bills), with reminders.
 - **Bills & money-out** — recurring payments incl. day-of-month and variable amounts
