@@ -37,6 +37,14 @@ export function intentTodayKey() {
   return dateKey(intentNow());
 }
 
+// The intent-day key (6am cutoff) a timestamp belongs to — so a 1am event is
+// credited to the day that's wrapping up. Returns null on an unparseable input.
+export function intentDayKey(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return dateKey(intentNow(d));
+}
+
 export function addDays(d, n) {
   const out = new Date(d);
   out.setDate(out.getDate() + n);

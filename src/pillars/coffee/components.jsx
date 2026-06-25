@@ -6,7 +6,7 @@ import {
 } from '../../components/primitives.jsx';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { useUI } from '../../store/uiContext.js';
-import { isToday, isThisMonth, timeAgo } from '../../lib/dates.js';
+import { isThisMonth, timeAgo, intentDayKey, intentTodayKey } from '../../lib/dates.js';
 
 // ─── Helper: render stars ─────────────────────────────────────────────────────
 export function Stars({ rating, size = 12, color }) {
@@ -22,7 +22,7 @@ export function CoffeePill() {
   const { coffee } = useApp();
   const { navigateToPillar, openPullModal } = useUI();
   const pulls = coffee.pulls;
-  const todayPulls = pulls.filter(p => isToday(p.at));
+  const todayPulls = pulls.filter(p => intentDayKey(p.at) === intentTodayKey());
   const lastPull = pulls[0];
 
   return (
@@ -44,11 +44,11 @@ export function CoffeePill() {
             display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
             fontFamily: T.fontSans, fontSize: 13, color: T.muted,
           }}>
-            <Stars rating={lastPull.rating} size={11} />
+            <Stars rating={lastPull.rating || 0} size={11} />
             <span style={{
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               flex: 1, minWidth: 0,
-            }}>{lastPull.recipeName.split(' — ')[0].split(' espresso')[0]}</span>
+            }}>{(lastPull.recipeName || 'Espresso').split(' — ')[0].split(' espresso')[0]}</span>
             <span style={{ flexShrink: 0 }}>{timeAgo(lastPull.at)}</span>
           </div>
         )}

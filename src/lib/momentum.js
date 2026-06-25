@@ -3,11 +3,11 @@
 // the Today strip and the Stats heatmap. This is the backbone of persistence:
 // it turns scattered logs into one picture of a life in motion.
 
-import { dateKey, addDays, intentNow } from './dates.js';
+import { dateKey, addDays, intentNow, intentDayKey } from './dates.js';
 
 // Attribute a timestamp to its intent day (rolls over at the 6am cutoff), so a
 // 1am coffee or deep-work session credits the day that's wrapping up.
-const dkOf = (iso) => { try { return dateKey(intentNow(new Date(iso))); } catch { return null; } };
+const dkOf = intentDayKey;
 
 // One check per trackable pillar: did anything happen that day?
 export const HONOR_CHECKS = {
