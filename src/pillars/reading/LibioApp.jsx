@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { greetingForNow, isThisYear, weekStart, dateKey, addDays } from '../../lib/dates.js';
+import { greetingForNow, isThisYear, weekStart, dateKey, addDays, intentNow } from '../../lib/dates.js';
 import {
   LIBIO_STATS_DATA,
 } from './data.js';
@@ -909,7 +909,9 @@ function LibioBookDetailScreen({ book, shelf, isPrimary, hasSiblings, sessions, 
 function computeReadingAnalytics(books) {
   const sessions = books.sessions || [];
   const read = books.read || [];
-  const now = new Date();
+  // Anchor "today" on the intent day (6am cutoff) so the streak base and the
+  // highlighted per-day bar match where late-night sessions are dated.
+  const now = intentNow();
 
   const pagesThisYear = sessions.filter(s => isThisYear(new Date(s.date))).reduce((a, s) => a + (s.pages || 0), 0);
   const pagesAllTime = sessions.reduce((a, s) => a + (s.pages || 0), 0);
@@ -920,7 +922,7 @@ function computeReadingAnalytics(books) {
   // Reading-day streak (a day with ≥1 session). Today not yet read doesn't break it.
   const dayset = new Set(sessions.map(s => s.date));
   let streak = 0;
-  let cursor = new Date();
+  let cursor = intentNow();
   if (!dayset.has(dateKey(cursor))) cursor = addDays(cursor, -1);
   while (dayset.has(dateKey(cursor))) { streak++; cursor = addDays(cursor, -1); }
 

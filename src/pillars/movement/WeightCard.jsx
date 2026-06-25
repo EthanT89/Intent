@@ -3,11 +3,11 @@ import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { Card, NumberField, PrimaryBtn, GhostBtn, ACCENT } from './ui.jsx';
 import { weightSummary } from './model.js';
-import { dateKey } from '../../lib/dates.js';
+import { intentTodayKey } from '../../lib/dates.js';
 
 // Relative label for a YYYY-MM-DD date key (Today / Yesterday / Nd ago / date).
 function whenLabel(key) {
-  const today = dateKey(new Date());
+  const today = intentTodayKey();
   if (key === today) return 'today';
   const diff = Math.round((new Date(today + 'T12:00:00') - new Date(key + 'T12:00:00')) / 86400000);
   if (diff === 1) return 'yesterday';
@@ -36,7 +36,7 @@ function Sparkline({ data }) {
 export function WeightCard() {
   const { movement, logWeight } = useApp();
   const { entries, latest, delta } = weightSummary(movement);
-  const tk = dateKey(new Date());
+  const tk = intentTodayKey();
   const loggedToday = !!(movement.weights || {})[tk];
 
   // Start in edit mode only when nothing is logged today; prefill with the most

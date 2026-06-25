@@ -3,7 +3,7 @@ import { PILLAR_COLORS, T } from '../../theme/tokens.js';
 import { PillarPill, CategoryLabel, GhostButton, SectionHeader } from '../../components/primitives.jsx';
 import { useUI } from '../../store/uiContext.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { intentTodayKey, dateKey, addDays } from '../../lib/dates.js';
+import { intentTodayKey, intentNow, dateKey, addDays } from '../../lib/dates.js';
 import { honoredOn } from '../../lib/momentum.js';
 
 // Local labels (avoid importing the registry — it imports this file back).
@@ -16,7 +16,7 @@ const ACCENT = PILLAR_COLORS.reflection;
 
 function hasEntry(day) { return !!(day && (day.intent || day.evening)); }
 
-function intentStreak(days, today = new Date()) {
+function intentStreak(days, today = intentNow()) {
   let streak = 0, started = false;
   for (let i = 0; i < 365; i++) {
     const k = dateKey(addDays(today, -i));
@@ -89,9 +89,10 @@ function ReflectionSection({ onBack }) {
   const evening = new Date().getHours() >= 17;
   const honoredToday = honoredOn(app, tKey).filter(id => id !== 'reflection').map(id => HONOR_LABELS[id]);
 
-  // This week recap (Mon-first) — light "weekly review".
-  const mondayIdx = (new Date().getDay() + 6) % 7;
-  const weekStartDate = addDays(new Date(), -mondayIdx);
+  // This week recap (Mon-first) — light "weekly review". Anchored on the intent
+  // day so the "today" cell matches the entry you're writing in the grace window.
+  const mondayIdx = (intentNow().getDay() + 6) % 7;
+  const weekStartDate = addDays(intentNow(), -mondayIdx);
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(weekStartDate, i);
     return { label: ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i], has: hasEntry(days[dateKey(d)]), isToday: dateKey(d) === tKey };
@@ -114,7 +115,7 @@ function ReflectionSection({ onBack }) {
           {evening ? 'Closing the day' : 'Setting the day'}
         </div>
         <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 16 }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {intentNow().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
         {honoredToday.length > 0 && (
           <div style={{
