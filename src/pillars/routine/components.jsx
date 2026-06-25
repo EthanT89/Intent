@@ -8,7 +8,14 @@ import { haptics } from '../../lib/haptics.js';
 import {
   isActiveDay, dayCompletionPct, computeRoutineStreak, computeItemStreak,
   withinWindow, windowLabel, TIME_WINDOWS, matchPreset,
+  dayCountsForStreak, STREAK_MIN_PCT,
 } from './model.js';
+
+// How many items still needed today to "secure" the streak (clear the bar).
+function itemsToSecure(routine, doneCount) {
+  const min = typeof routine.streakMinPct === 'number' ? routine.streakMinPct : STREAK_MIN_PCT;
+  return Math.max(0, Math.ceil(routine.items.length * min) - doneCount);
+}
 
 // ─── Today pill — one checklist card per routine scheduled today ─────────────
 export function RoutinePill() {
@@ -120,6 +127,9 @@ function OneRoutinePill({ routine, today }) {
   const doneCount = routine.items.filter(it => todayMap[it.id]).length;
   const allDone = routine.items.length > 0 && doneCount === routine.items.length;
   const streak = computeRoutineStreak(routine, history, today);
+  const secured = routine.items.length > 0 && dayCountsForStreak(routine, todayMap);
+  const needed = itemsToSecure(routine, doneCount);
+  const showNudge = !secured && doneCount > 0 && needed > 0;
 
   const lower = routine.name.toLowerCase();
   const label = lower === 'morning' ? 'this morning' : lower === 'evening' ? 'this evening' : lower;
@@ -163,10 +173,10 @@ function OneRoutinePill({ routine, today }) {
           );
         })}
         <div style={{
-          fontFamily: T.fontSans, fontSize: 12, color: allDone ? T.pillars.routine : T.muted,
+          fontFamily: T.fontSans, fontSize: 12, color: secured ? T.pillars.routine : T.muted,
           marginTop: 10, paddingTop: 10,
           borderTop: `0.5px solid ${T.border}`,
-        }}>{allDone ? '✓ ' : ''}{doneCount} of {routine.items.length} done · {streak} day streak</div>
+        }}>{secured ? '✓ ' : ''}{doneCount} of {routine.items.length} done · {showNudge ? `${needed} more to keep your streak` : `${streak} day streak`}</div>
       </div>
     </PillarPill>
   );
@@ -362,6 +372,9 @@ export function RoutineSection({ onBack, arg }) {
   const todayMap = routineHist[tKey] || {};
   const todayDoneCount = routine.items.filter(it => todayMap[it.id]).length;
   const streak = computeRoutineStreak(routine, routineHist, today);
+  const secured = routine.items.length > 0 && dayCountsForStreak(routine, todayMap);
+  const needed = itemsToSecure(routine, todayDoneCount);
+  const showNudge = !secured && todayDoneCount > 0 && needed > 0;
   const stripEnd = addDays(today, -stripEndOffset);
   const isActiveToday = isActiveDay(routine, today);
   const disabled = routine.disabled === true;
@@ -568,11 +581,11 @@ export function RoutineSection({ onBack, arg }) {
           )}
           {routine.items.length > 0 && (
             <div style={{
-              fontFamily: T.fontSans, fontSize: 12, color: T.muted,
+              fontFamily: T.fontSans, fontSize: 12, color: secured ? accent : T.muted,
               padding: '11px 0 10px',
               borderTop: `0.5px solid ${T.border}`,
               textAlign: 'center',
-            }}>{todayDoneCount} of {routine.items.length} done</div>
+            }}>{secured ? '✓ ' : ''}{todayDoneCount} of {routine.items.length} done{showNudge ? ` · ${needed} more to keep your streak` : ''}</div>
           )}
         </div>
       ) : (

@@ -63,8 +63,19 @@ export function dayCompletionPct(routine, dayMap) {
   return done / total;
 }
 
-// Whole-routine streak: walk back from today across days-on.
-// Today only counts if fully complete; an unfinished today doesn't break it.
+// Real life isn't all-or-nothing: a day "counts" toward the streak when you do
+// at least half your items, so forgetting one (or a few) never wipes it. For any
+// routine of 2+ items, missing exactly one is always forgiven (n-1 ≥ n/2).
+// A routine can override the bar with `streakMinPct` (0–1).
+export const STREAK_MIN_PCT = 0.5;
+export function dayCountsForStreak(routine, dayMap) {
+  if (!routine.items || routine.items.length === 0) return false;
+  const min = typeof routine.streakMinPct === 'number' ? routine.streakMinPct : STREAK_MIN_PCT;
+  return dayCompletionPct(routine, dayMap) >= min;
+}
+
+// Whole-routine streak: walk back from today across days-on. A day counts if it
+// clears the (forgiving) completion bar; an unfinished *today* never breaks it.
 export function computeRoutineStreak(routine, history, today = intentNow()) {
   let streak = 0;
   let started = false;
@@ -72,9 +83,9 @@ export function computeRoutineStreak(routine, history, today = intentNow()) {
     const d = addDays(today, -i);
     if (!isActiveDay(routine, d)) continue;
     const k = dateKey(d);
-    const complete = isDayComplete(routine, history[k]);
-    if (i === 0 && !complete) { started = true; continue; }
-    if (complete) { streak++; started = true; }
+    const counts = dayCountsForStreak(routine, history[k]);
+    if (i === 0 && !counts) { started = true; continue; }
+    if (counts) { streak++; started = true; }
     else if (started) break;
   }
   return streak;
