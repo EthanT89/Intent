@@ -74,10 +74,15 @@ function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
 function clampDay(y, m, day) { return Math.min(day, daysInMonth(y, m)); }
 function weekIdx(d) { return Math.floor(weekStart(d).getTime() / (7 * 86400000)); }
 
-// Concrete due Dates (noon-local) for a bill within [start, end].
+// Concrete due Dates (noon-local) for a bill within [start, end]. The series
+// never starts before its anchor (the date the bill was created / set to begin),
+// so a freshly-added recurring bill can't conjure "overdue" dues for months it
+// didn't exist. Bills with no anchor (legacy) keep the old open-ended behavior.
 export function billOccurrences(bill, start, end) {
   const r = bill.recur || {};
   const s = startOfDay(start), e = endOfDay(end);
+  const floor = r.anchor ? startOfDay(new Date(`${r.anchor}T12:00:00`)) : null;
+  const within = (d) => d >= s && d <= e && (!floor || d >= floor);
   const out = [];
   if (r.unit === 'once') {
     if (!r.anchor) return out;
@@ -92,7 +97,7 @@ export function billOccurrences(bill, start, end) {
     let d = new Date(s); d.setHours(12, 0, 0, 0);
     while (d.getDay() !== wd) d = addDays(d, 1);
     for (let i = 0; i < 430 && d <= e; i++) {
-      if ((((weekIdx(d) - weekIdx(anchor)) % interval) + interval) % interval === 0) out.push(new Date(d));
+      if ((((weekIdx(d) - weekIdx(anchor)) % interval) + interval) % interval === 0 && within(d)) out.push(new Date(d));
       d = addDays(d, 7);
     }
     return out;
@@ -103,7 +108,7 @@ export function billOccurrences(bill, start, end) {
     for (let y = s.getFullYear() - 1; y <= e.getFullYear() + 1; y++) {
       if ((((y - anchorY) % interval) + interval) % interval !== 0) continue;
       const d = new Date(y, mon, clampDay(y, mon, day), 12, 0, 0);
-      if (d >= s && d <= e) out.push(d);
+      if (within(d)) out.push(d);
     }
     return out;
   }
@@ -117,7 +122,7 @@ export function billOccurrences(bill, start, end) {
     const cm = cur.getFullYear() * 12 + cur.getMonth();
     if ((((cm - anchorMonths) % interval) + interval) % interval === 0) {
       const d = new Date(cur.getFullYear(), cur.getMonth(), clampDay(cur.getFullYear(), cur.getMonth(), day), 12, 0, 0);
-      if (d >= s && d <= e) out.push(d);
+      if (within(d)) out.push(d);
     }
     cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
   }
