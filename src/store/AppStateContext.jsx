@@ -451,7 +451,7 @@ export function AppStateProvider({ children }) {
     const exportData = () => {
       const payload = {
         exportedAt: new Date().toISOString(),
-        settings, coffee, books, routines, movement, reflection, calendar, bills, deepwork,
+        settings, coffee, books, routines, movement, reflection, calendar, bills, deepwork, firstUse,
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -475,6 +475,7 @@ export function AppStateProvider({ children }) {
       if (payload.calendar) { setCalendar(payload.calendar); restored.push('calendar'); }
       if (payload.bills) { setBills(payload.bills); restored.push('bills'); }
       if (payload.deepwork) { setDeepwork(payload.deepwork); restored.push('deep work'); }
+      if (payload.firstUse) setFirstUse(payload.firstUse); // preserve "member since" (not user-facing as a slice)
       if (!restored.length) return { ok: false, error: 'No Intent data found in that file.' };
       return { ok: true, restored };
     };
