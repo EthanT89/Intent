@@ -8,7 +8,7 @@ import {
 import {
   fmtTime, fmtHourLabel, minutesOf, layoutTimed, compareItems, buildICS, DEFAULT_EVENT_COLOR, pad2,
 } from '../pillars/calendar/model.js';
-import { itemsForRange, itemsForDate, inboxTasks, CAL_SOURCES } from '../pillars/calendar/sources.js';
+import { itemsForRange, itemsForDate, inboxTasks, overdueTasks, CAL_SOURCES } from '../pillars/calendar/sources.js';
 import { CalendarComposer } from '../pillars/calendar/CalendarComposer.jsx';
 import { BillsManager } from '../pillars/calendar/BillsScreen.jsx';
 import { refreshSubscriptions } from '../lib/icsSync.js';
@@ -540,8 +540,11 @@ function AgendaView({ app, cursor, now, onItem, onToggle }) {
   all.forEach(it => { (byDate[it.date] = byDate[it.date] || []).push(it); });
   const days = Object.keys(byDate).sort();
   const inbox = inboxTasks(app);
+  // Show past-due to-dos at the top, but only when the agenda is anchored at/before
+  // now (not while paging into the future).
+  const overdue = start <= now ? overdueTasks(app, now) : [];
 
-  if (days.length === 0 && inbox.length === 0) {
+  if (days.length === 0 && inbox.length === 0 && overdue.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 24px' }}>
         <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 8 }}>Nothing ahead yet</div>
@@ -552,6 +555,12 @@ function AgendaView({ app, cursor, now, onItem, onToggle }) {
 
   return (
     <div style={{ paddingTop: 8 }}>
+      {overdue.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ ...agendaHead, color: '#B8453E' }}>Overdue · {overdue.length}</div>
+          {overdue.map(t => <TaskRow key={t.id} task={t} onToggle={onToggle} onOpen={() => onItem({ kind: 'task', ref: t, date: t.due.slice(0, 10) })} />)}
+        </div>
+      )}
       {inbox.length > 0 && (
         <div style={{ marginBottom: 18 }}>
           <div style={agendaHead}>Anytime</div>

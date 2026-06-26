@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../theme/tokens.js';
 import { useApp } from '../store/AppStateContext.jsx';
 import { useUI } from '../store/uiContext.js';
-import { itemsForDate } from '../pillars/calendar/sources.js';
+import { itemsForDate, overdueTasks } from '../pillars/calendar/sources.js';
 import { compareItems, fmtTime } from '../pillars/calendar/model.js';
 import { dateKey } from '../lib/dates.js';
 
@@ -26,9 +26,7 @@ export function TodayAgenda() {
   // Past-due, unfinished to-dos don't vanish — they resurface here until done or
   // rescheduled, so nothing slips through the cracks.
   const tk = dateKey(new Date());
-  const overdue = (app.calendar?.tasks || [])
-    .filter(t => t.due && !t.done && t.due.slice(0, 10) < tk)
-    .sort((a, b) => (a.due < b.due ? -1 : 1));
+  const overdue = overdueTasks(app);
 
   if (items.length === 0 && overdue.length === 0) return null;
 

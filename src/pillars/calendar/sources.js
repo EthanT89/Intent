@@ -220,3 +220,12 @@ export function itemsForDate(app, date) {
 export function inboxTasks(app) {
   return (app.calendar?.tasks || []).filter(t => !t.due);
 }
+
+// Past-due, unfinished dated tasks (relative to `now`), oldest first — so an
+// undone to-do resurfaces instead of being stranded on a day already gone by.
+export function overdueTasks(app, now = new Date()) {
+  const tk = dateKey(now);
+  return (app.calendar?.tasks || [])
+    .filter(t => t.due && !t.done && t.due.slice(0, 10) < tk)
+    .sort((a, b) => (a.due < b.due ? -1 : 1));
+}
