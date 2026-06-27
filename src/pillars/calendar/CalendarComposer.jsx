@@ -60,6 +60,7 @@ export function CalendarComposer({ composer, onClose }) {
   const [tTime, setTTime] = React.useState(tDue && editTask.due.length > 10 ? `${pad2(tDue.getHours())}:${pad2(tDue.getMinutes())}` : '09:00');
   const [tNotes, setTNotes] = React.useState(editTask ? (editTask.notes || '') : '');
   const [tRemind, setTRemind] = React.useState(editTask && editTask.remind != null ? editTask.remind : null);
+  const [tRecur, setTRecur] = React.useState(editTask ? (editTask.recur || 'none') : 'none');
 
   const saveEv = () => {
     if (!title.trim()) return;
@@ -72,7 +73,7 @@ export function CalendarComposer({ composer, onClose }) {
   const saveTk = () => {
     if (!tTitle.trim()) return;
     const due = tScheduled ? (tTimed ? `${tDate}T${tTime}` : tDate) : null;
-    saveTask({ id: editTask?.id, title: tTitle.trim(), due, notes: tNotes.trim(), done: editTask?.done, remind: due ? tRemind : null });
+    saveTask({ id: editTask?.id, title: tTitle.trim(), due, notes: tNotes.trim(), done: editTask?.done, remind: due ? tRemind : null, recur: due ? tRecur : 'none' });
     onClose();
   };
 
@@ -184,6 +185,12 @@ export function CalendarComposer({ composer, onClose }) {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', marginBottom: 14 }}>
                   <span style={{ fontFamily: T.fontSans, fontSize: 14, color: T.ink, fontWeight: 500 }}>Set a time</span>
                   <Toggle on={tTimed} onChange={setTTimed} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={labelStyle}>Repeat</div>
+                  <select value={tRecur} onChange={e => setTRecur(e.target.value)} style={{ ...field, appearance: 'none' }}>
+                    {RECUR_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <div style={labelStyle}>Reminder</div>

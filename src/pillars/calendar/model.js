@@ -12,7 +12,7 @@
 // contributed by source adapters (see sources.js). That's the expansion seam:
 // a new app feature shows up on the calendar by registering one adapter.
 
-import { addDays, addMonths } from '../../lib/dates.js';
+import { addDays, addMonths, dateKey } from '../../lib/dates.js';
 
 export const CAL_SEED = {
   events: [],
@@ -116,6 +116,31 @@ export function expandEvent(ev, rangeStart, rangeEnd) {
     else break;
   }
   return out;
+}
+
+// Next due date-string for a recurring task, strictly after `notBefore`,
+// preserving any time-of-day. Returns null for non-repeating tasks. Used to roll
+// a recurring to-do forward to its next occurrence when you complete it.
+export function nextTaskDue(task, notBefore = new Date()) {
+  const recur = task.recur || 'none';
+  if (recur === 'none' || !task.due) return null;
+  const timed = task.due.length > 10;
+  let d = parseDT(task.due);
+  if (!d) return null;
+  const step = (x) => {
+    if (recur === 'daily') return addDays(x, 1);
+    if (recur === 'weekly') return addDays(x, 7);
+    if (recur === 'monthly') return addMonths(x, 1);
+    if (recur === 'weekday') { let n = addDays(x, 1); while (n.getDay() === 0 || n.getDay() === 6) n = addDays(n, 1); return n; }
+    return null;
+  };
+  let guard = 0;
+  do {
+    const nx = step(d);
+    if (!nx) return null;
+    d = nx;
+  } while (d <= notBefore && guard++ < 2000);
+  return timed ? `${dateKey(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}` : dateKey(d);
 }
 
 // Sort comparator for a day's items: all-day first, then by start time, then title.

@@ -605,6 +605,7 @@ function TaskRow({ task, onToggle, onOpen, timed }) {
       <Check done={task.done} color="#9CA398" onClick={() => onToggle(task.id)} />
       <span onClick={onOpen} style={{ width: timed ? 64 : 0, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{timed ? fmtTime(timed) : ''}</span>
       <span onClick={onOpen} style={{ flex: 1, fontFamily: T.fontSans, fontSize: 14, color: task.done ? T.muted : T.ink, fontWeight: 500, textDecoration: task.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+      {task.recur && task.recur !== 'none' && <span onClick={onOpen} title="Repeats" style={{ flexShrink: 0, fontSize: 11, color: T.muted }}>↻</span>}
     </div>
   );
 }

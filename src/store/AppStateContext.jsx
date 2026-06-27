@@ -3,7 +3,7 @@ import { usePersistentState, clearAllAppData } from './usePersistentState.js';
 import { todayKey, intentTodayKey, isThisYear } from '../lib/dates.js';
 import { LIBIO_BOOKS_SEED } from '../pillars/reading/data.js';
 import { MOVEMENT_SEED, uid, ruleId } from '../pillars/movement/model.js';
-import { CAL_SEED, uid as calUid } from '../pillars/calendar/model.js';
+import { CAL_SEED, uid as calUid, nextTaskDue } from '../pillars/calendar/model.js';
 import { uid as billUid } from '../pillars/calendar/bills.js';
 import { PILLARS } from '../pillars/registry.js';
 import { useCloudSync } from '../lib/cloudSync.js';
@@ -386,7 +386,16 @@ export function AppStateProvider({ children }) {
       return { ...prev, tasks: [...list, { ...t, id: t.id || calUid('tk'), done: !!t.done }] };
     });
     const toggleTask = (id) => setCalendar(prev => ({
-      ...prev, tasks: (prev.tasks || []).map(t => t.id === id ? { ...t, done: !t.done } : t),
+      ...prev, tasks: (prev.tasks || []).map(t => {
+        if (t.id !== id) return t;
+        // A recurring to-do isn't "checked off" — completing it rolls forward to
+        // its next occurrence (staying unchecked). Non-repeating tasks just toggle.
+        if (!t.done && t.recur && t.recur !== 'none' && t.due) {
+          const next = nextTaskDue(t);
+          if (next) return { ...t, due: next, done: false };
+        }
+        return { ...t, done: !t.done };
+      }),
     }));
     const deleteTask = (id) => setCalendar(prev => ({ ...prev, tasks: (prev.tasks || []).filter(t => t.id !== id) }));
 

@@ -94,6 +94,7 @@ export function TodayAgenda() {
               : <span style={{ width: 7, height: 7, borderRadius: 2, background: it.color, flexShrink: 0 }} />}
             <span style={{ width: 58, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{it.allDay ? '' : fmtTime(it.start)}</span>
             <span style={{ flex: 1, minWidth: 0, fontFamily: T.fontSans, fontSize: 14, color: it.done ? T.muted : T.ink, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: it.done ? 'line-through' : 'none' }}>{it.title}</span>
+            {it.kind === 'task' && it.ref?.recur && it.ref.recur !== 'none' && <span style={{ flexShrink: 0, fontSize: 11, color: T.muted }}>↻</span>}
           </div>
         ))}
       </div>
