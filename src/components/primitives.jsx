@@ -377,7 +377,7 @@ export function DayPills({ days, todayIndex = 2 }) {
 // ─── Stub section page ───────────────────────────────────────────────────────
 export function StubPage({ title, accentColor, onBack }) {
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title={title} accentColor={accentColor} onBack={onBack} />
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -396,7 +396,7 @@ export function StubPage({ title, accentColor, onBack }) {
 // ─── Pillar stats stub page ──────────────────────────────────────────────────
 export function PillarStatStub({ title, accentColor, onBack }) {
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title={title} accentColor={accentColor} onBack={onBack} backLabel="Stats" />
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',

@@ -68,7 +68,7 @@ export function CoffeeSection({ onBack }) {
   const visiblePulls = pulls.slice(0, 4);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Coffee" accentColor={accentColor} onBack={onBack} />
 
       <DarkButton onClick={() => openPullModal()} style={{ marginBottom: 28 }}>Log a pull</DarkButton>
@@ -600,7 +600,7 @@ export function CoffeeStatsScreen({ onBack }) {
   const lastRating = coffee.pulls[0] ? coffee.pulls[0].rating : 0;
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Coffee stats" accentColor={accent} onBack={onBack} backLabel="Stats" />
 
       {/* Top metric grid */}

@@ -106,7 +106,7 @@ function ReflectionSection({ onBack }) {
     .slice(0, 30);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Reflection" accentColor={ACCENT} onBack={onBack} />
 
       {/* Today */}

@@ -139,7 +139,7 @@ function NourishmentSection({ onBack }) {
   const weekProtein = ['M','T','W','T','F','S','S'].map(label => ({ label, value: 0 }));
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Nourishment" accentColor={accentColor} onBack={onBack} />
 
       {/* Today's stats */}

@@ -41,7 +41,7 @@ export function MovementSection({ onBack, arg }) {
   const todayWorkouts = scheduledFor(movement.schedule || {}, intentNow()).map(id => wkById[id]).filter(Boolean);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Movement" accentColor={ACCENT} onBack={onBack} />
       <Segmented value={view} onChange={setView} options={[
         { id: 'today', label: 'Today' },

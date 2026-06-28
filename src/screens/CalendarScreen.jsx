@@ -148,7 +148,7 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
       </div>
 
       {/* Body */}
-      <div ref={bodyRef} className="intent-scroll" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px 130px' }}>
+      <div ref={bodyRef} className="intent-scroll" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 16px calc(130px + var(--safe-bottom))' }}>
         <div key={`${view}:${dateKey(cursor)}`} className="cal-fade">
           {view === 'day' && <DayView app={app} cursor={cursor} now={now} onItem={openItem} onCreate={(h) => setComposer({ mode: 'event', date: dateKey(cursor), startHour: h })} />}
           {view === 'week' && <WeekView app={app} cursor={cursor} now={now} onItem={openItem} onPickDay={(d) => { setCursor(d); changeView('day'); }} onCreate={(d, h) => setComposer({ mode: 'event', date: dateKey(d), startHour: h })} />}

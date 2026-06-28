@@ -206,7 +206,7 @@ export function DeepWorkSection({ onBack }) {
   const recentSessions = (deepwork.sessions || []).slice(0, 8);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Deep work" accentColor={accentColor} onBack={onBack} />
 
       {/* Active session status */}

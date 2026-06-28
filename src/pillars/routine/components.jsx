@@ -324,7 +324,7 @@ export function RoutineSection({ onBack, arg }) {
   // Empty state — no routines yet
   if (!routine && !editing) {
     return (
-      <div style={{ padding: '10px 16px 120px' }}>
+      <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
         <div style={{ paddingTop: 8, marginBottom: 16 }}>
           <button onClick={onBack} style={{
             background: 'none', border: 'none', cursor: 'pointer',
@@ -402,7 +402,7 @@ export function RoutineSection({ onBack, arg }) {
   }
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       {/* Header with back + edit */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: 8, marginBottom: 16 }}>
         <button onClick={onBack} style={{
@@ -710,7 +710,7 @@ function EditRoutineScreen({ routine, onClose, onSave, onDelete, canDelete }) {
   };
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

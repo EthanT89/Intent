@@ -101,7 +101,7 @@ export function TodayScreen() {
   });
 
   return (
-    <div style={{ padding: '12px 16px 120px', position: 'relative' }}>
+    <div style={{ padding: '12px 16px calc(120px + var(--safe-bottom))', position: 'relative' }}>
       {/* Gear icon — top-right */}
       <button
         onClick={openSettings}

@@ -716,7 +716,7 @@ function SettingsContent() {
 // ─── Settings full-page screen ────────────────────────────────────────────────
 export function SettingsScreen({ onBack }) {
   return (
-    <div style={{ padding: '8px 16px 120px' }}>
+    <div style={{ padding: '8px 16px calc(120px + var(--safe-bottom))' }}>
       <div style={{ paddingTop: 8, paddingBottom: 4 }}>
         <button onClick={onBack} style={{
           display: 'flex', alignItems: 'center', gap: 5,

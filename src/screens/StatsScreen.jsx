@@ -25,7 +25,7 @@ export function StatsScreen({ onDrillDown }) {
     .filter(Boolean);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       {/* Page title */}
       <div style={{
         fontFamily: T.fontSerif, fontSize: 28, fontWeight: 600,

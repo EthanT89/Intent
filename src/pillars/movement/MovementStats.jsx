@@ -50,7 +50,7 @@ export function MovementStats({ onBack }) {
   const maxVol = Math.max(...weeks.map(w => w.volume), 1);
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <SectionHeader title="Movement" accentColor={ACCENT} onBack={onBack} backLabel="Stats" />
 
       {sessions.length === 0 && (

@@ -20,7 +20,7 @@ export function ExerciseEditor({ exercise, onClose }) {
   };
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(120px + var(--safe-bottom))' }}>
       <BackBar label="Movement" onBack={onClose} title={isNew ? 'New exercise' : 'Edit exercise'} />
 
       <Labeled label="Name">

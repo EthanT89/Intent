@@ -100,7 +100,7 @@ export function WorkoutLogger({ workout, onClose }) {
   };
 
   return (
-    <div style={{ padding: '10px 16px 120px' }}>
+    <div style={{ padding: '10px 16px calc(150px + var(--safe-bottom))' }}>
       <BackBar label="Movement" onBack={onClose} title={`Log: ${workout.name || 'Workout'}`} />
 
       {entries.length === 0 && (
@@ -201,7 +201,7 @@ function RestTimer() {
 
   return (
     <div style={{
-      position: 'sticky', bottom: 90, marginTop: 18, zIndex: 20,
+      position: 'sticky', bottom: 'calc(96px + var(--safe-bottom))', marginTop: 18, zIndex: 50,
       background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 16,
       padding: 12, boxShadow: '0 4px 18px rgba(44,36,24,0.12)',
     }}>
