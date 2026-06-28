@@ -336,10 +336,17 @@ export function AppStateProvider({ children }) {
       return { ...prev, schedule: sched };
     });
 
-    const logWorkoutSession = (session) => setMovement(prev => ({
-      ...prev,
-      sessions: [{ id: uid('ses'), date: today, at: new Date().toISOString(), ...session }, ...(prev.sessions || [])],
-    }));
+    const logWorkoutSession = (session) => setMovement(prev => {
+      const existing = session.workoutId
+        ? (prev.sessions || []).findIndex(s => s.workoutId === session.workoutId && s.date === today)
+        : -1;
+      if (existing >= 0) {
+        const sessions = [...(prev.sessions || [])];
+        sessions[existing] = { ...sessions[existing], ...session, at: new Date().toISOString() };
+        return { ...prev, sessions };
+      }
+      return { ...prev, sessions: [{ id: uid('ses'), date: today, at: new Date().toISOString(), ...session }, ...(prev.sessions || [])] };
+    });
     const deleteSession = (id) => setMovement(prev => ({
       ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
     }));
