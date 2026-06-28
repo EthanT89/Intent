@@ -5,6 +5,7 @@ import { useUI } from '../store/uiContext.js';
 import { itemsForDate, overdueTasks } from '../pillars/calendar/sources.js';
 import { compareItems, fmtTime } from '../pillars/calendar/model.js';
 import { dateKey } from '../lib/dates.js';
+import { haptics } from '../lib/haptics.js';
 
 // How late an overdue task is, relative to today (1 = yesterday).
 function lateLabel(dueKey, todayKey) {
@@ -54,7 +55,7 @@ export function TodayAgenda() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {shownOverdue.map(t => (
               <div key={t.id} onClick={() => goToTab('calendar')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', cursor: 'pointer' }}>
-                <button onClick={(e) => { e.stopPropagation(); toggleTask(t.id); }} style={{
+                <button onClick={(e) => { e.stopPropagation(); haptics.tap(); toggleTask(t.id); }} style={{
                   width: 18, height: 18, flexShrink: 0, borderRadius: '50%', cursor: 'pointer', padding: 0,
                   border: `1.5px solid ${RED}`, background: 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -86,7 +87,7 @@ export function TodayAgenda() {
         {shown.map(it => (
           <div key={it.id} onClick={() => onRow(it)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', cursor: 'pointer' }}>
             {it.kind === 'task'
-              ? <button onClick={(e) => { e.stopPropagation(); toggleTask(it.ref.id); }} style={{
+              ? <button onClick={(e) => { e.stopPropagation(); haptics.tap(); toggleTask(it.ref.id); }} style={{
                   width: 18, height: 18, flexShrink: 0, borderRadius: '50%', cursor: 'pointer', padding: 0,
                   border: `1.5px solid ${it.done ? T.amber : T.border}`, background: it.done ? T.amber : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',

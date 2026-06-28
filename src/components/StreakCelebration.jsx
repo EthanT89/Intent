@@ -21,10 +21,11 @@ const CONFETTI = ['#C4956A', '#7A8C7E', '#8B6B4A', '#7C6F8E', '#B8893E', '#6B7A5
 export function StreakCelebration({ milestone, onClose }) {
   const [shown, setShown] = React.useState(false);
   React.useEffect(() => { const id = requestAnimationFrame(() => setShown(true)); return () => cancelAnimationFrame(id); }, []);
-  const pieces = React.useMemo(() => Array.from({ length: 30 }, (_, i) => ({
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pieces = React.useMemo(() => reduceMotion ? [] : Array.from({ length: 30 }, (_, i) => ({
     left: Math.random() * 100, delay: Math.random() * 0.4, dur: 1.6 + Math.random() * 1.2,
     color: CONFETTI[i % CONFETTI.length], size: 6 + Math.random() * 6,
-  })), []);
+  })), [reduceMotion]);
   const line = LINES[milestone] || `${milestone} days of showing up.`;
 
   return (

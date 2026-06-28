@@ -26,11 +26,13 @@ export function FinishCelebration({ book, booksThisYear, onClose, onFindNext }) 
     return () => cancelAnimationFrame(id);
   }, []);
 
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // Stable per-mount picks (no Math.random in render path that re-runs).
   const pick = React.useMemo(() => ({
     line: LINES[Math.floor(Math.random() * LINES.length)],
     nudge: NUDGES[Math.floor(Math.random() * NUDGES.length)],
-    pieces: Array.from({ length: 28 }, (_, i) => ({
+    pieces: reduceMotion ? [] : Array.from({ length: 28 }, (_, i) => ({
       left: Math.random() * 100,
       delay: Math.random() * 0.4,
       dur: 1.6 + Math.random() * 1.2,

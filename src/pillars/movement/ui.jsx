@@ -67,6 +67,7 @@ export function NumberField({ label, value, onChange, step = 1, unit = '', min =
         <button aria-label={`Decrease${label ? ' ' + label.toLowerCase() : ''}`} onClick={() => bump(-1)} style={stepBtn}>−</button>
         <input
           type="number" inputMode="decimal" value={v}
+          onFocus={e => e.target.select()}
           onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
           style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', textAlign: 'center', background: 'transparent', fontFamily: T.fontSans, fontSize: 15, fontWeight: 600, color: T.ink, padding: '9px 0' }}
         />
