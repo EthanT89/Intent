@@ -7,6 +7,8 @@ import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
 import { haptics } from '../../lib/haptics.js';
 
+const DRAFT_KEY = 'intent.logging.draft';
+
 // Most recent prior session entry for an exercise (for "last time" + prefill).
 function lastEntryFor(sessions, exerciseId) {
   for (const s of sessions) {
@@ -32,8 +34,10 @@ function summarizeLast(last) {
 // Log a workout session. Pre-fills each exercise's sets from the workout's
 // targets; you record what you actually did (weight × reps per set, or
 // time/distance), check off exercises, add overall duration + notes.
-export function WorkoutLogger({ workout, onClose }) {
-  const { movement, logWorkoutSession } = useApp();
+// Pass `session` to enter edit mode — pre-fills from the existing session
+// and updates it in place on save.
+export function WorkoutLogger({ workout, session: editSession, onClose }) {
+  const { movement, logWorkoutSession, updateSession } = useApp();
   const exById = Object.fromEntries((movement.exercises || []).map(e => [e.id, e]));
   const sessions = movement.sessions || [];
 
@@ -46,28 +50,61 @@ export function WorkoutLogger({ workout, onClose }) {
   const bestByEx = {};
   (workout.items || []).forEach(it => { bestByEx[it.exerciseId] = bestE1RM(sessions, it.exerciseId); });
 
-  // Seed entries: prefer what you did last time, falling back to the template.
-  const [entries, setEntries] = React.useState(() => (workout.items || []).map(it => {
-    const ex = exById[it.exerciseId];
-    const k = kindOf(ex?.kind);
-    const last = lastByEx[it.exerciseId]?.entry;
-    const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', done: false };
-    if (k.perSet) {
-      if (last && (last.sets || []).length) {
-        base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
+  // Seed entries: edit session > saved draft > last time > template.
+  const [entries, setEntries] = React.useState(() => {
+    if (editSession) return editSession.entries || [];
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (draft && draft.workoutId === workout.id && draft.entries) return draft.entries;
+    } catch {}
+    return (workout.items || []).map(it => {
+      const ex = exById[it.exerciseId];
+      const k = kindOf(ex?.kind);
+      const last = lastByEx[it.exerciseId]?.entry;
+      const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', done: false };
+      if (k.perSet) {
+        if (last && (last.sets || []).length) {
+          base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
+        } else {
+          const n = Math.max(1, Number(it.sets) || 1);
+          base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' }));
+        }
       } else {
-        const n = Math.max(1, Number(it.sets) || 1);
-        base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' }));
+        base.duration = (last && last.duration) ?? it.duration ?? '';
+        base.distance = (last && last.distance) ?? it.distance ?? '';
+        base.sets = [];
       }
-    } else {
-      base.duration = (last && last.duration) ?? it.duration ?? '';
-      base.distance = (last && last.distance) ?? it.distance ?? '';
-      base.sets = [];
-    }
-    return base;
-  }));
-  const [durationMin, setDurationMin] = React.useState('');
-  const [notes, setNotes] = React.useState('');
+      return base;
+    });
+  });
+
+  const [durationMin, setDurationMin] = React.useState(() => {
+    if (editSession) return editSession.durationMin ?? '';
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (draft && draft.workoutId === workout.id) return draft.durationMin ?? '';
+    } catch {}
+    return '';
+  });
+
+  const [notes, setNotes] = React.useState(() => {
+    if (editSession) return editSession.notes ?? '';
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (draft && draft.workoutId === workout.id) return draft.notes ?? '';
+    } catch {}
+    return '';
+  });
+
+  // Persist in-progress state so the user can exit the app and return.
+  React.useEffect(() => {
+    if (editSession) return;
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ workoutId: workout.id, entries, durationMin, notes }));
+    } catch {}
+  }, [entries, durationMin, notes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch {} };
 
   // Drag to reorder exercises mid-workout (same primitive as the builder).
   const rowRefs = React.useRef([]);
@@ -89,19 +126,27 @@ export function WorkoutLogger({ workout, onClose }) {
   const anyData = entries.some(e => e.done || (e.sets || []).some(s => s.reps || s.weight) || e.duration || e.distance);
 
   const save = () => {
-    logWorkoutSession({
+    const payload = {
       workoutId: workout.id || null,
       name: workout.name || 'Workout',
       durationMin: durationMin === '' ? null : Number(durationMin),
       notes: notes.trim(),
       entries,
-    });
+    };
+    if (editSession) {
+      updateSession(editSession.id, payload);
+    } else {
+      clearDraft();
+      logWorkoutSession(payload);
+    }
     onClose();
   };
 
+  const handleClose = () => { clearDraft(); onClose(); };
+
   return (
     <div style={{ padding: '10px 16px 120px' }}>
-      <BackBar label="Movement" onBack={onClose} title={`Log: ${workout.name || 'Workout'}`} />
+      <BackBar label="Movement" onBack={handleClose} title={editSession ? `Edit: ${workout.name || 'Workout'}` : `Log: ${workout.name || 'Workout'}`} />
 
       {entries.length === 0 && (
         <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, padding: '14px 0', textAlign: 'center' }}>
@@ -173,7 +218,7 @@ export function WorkoutLogger({ workout, onClose }) {
       <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="How did it feel? PRs, tweaks…"
         style={{ width: '100%', boxSizing: 'border-box', height: 70, resize: 'none', padding: '11px 13px', border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.card, fontFamily: T.fontSans, fontSize: 14, color: T.ink, outline: 'none', marginBottom: 16, lineHeight: 1.5 }} />
 
-      <PrimaryBtn onClick={save} color={ACCENT} style={{ opacity: anyData ? 1 : 0.5 }}>Save workout</PrimaryBtn>
+      <PrimaryBtn onClick={save} color={ACCENT} style={{ opacity: anyData ? 1 : 0.5 }}>{editSession ? 'Update workout' : 'Save workout'}</PrimaryBtn>
 
       <RestTimer />
     </div>

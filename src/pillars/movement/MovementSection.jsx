@@ -18,6 +18,7 @@ export function MovementSection({ onBack, arg }) {
   const [editingExercise, setEditingExercise] = React.useState(null);
   const [editingWorkout, setEditingWorkout] = React.useState(null);
   const [logging, setLogging] = React.useState(null);
+  const [editingSession, setEditingSession] = React.useState(null);
   const [pickLog, setPickLog] = React.useState(false);
 
   // Deep-link from the Today pill's "Log workout": open the logger straight away
@@ -33,6 +34,10 @@ export function MovementSection({ onBack, arg }) {
   if (editingExercise) return <ExerciseEditor exercise={editingExercise} onClose={() => setEditingExercise(null)} />;
   if (editingWorkout) return <WorkoutBuilder workout={editingWorkout} onClose={() => setEditingWorkout(null)} />;
   if (logging) return <WorkoutLogger workout={logging} onClose={() => setLogging(null)} />;
+  if (editingSession) {
+    const wk = { id: editingSession.workoutId, name: editingSession.name, items: (editingSession.entries || []).map(e => ({ exerciseId: e.exerciseId })) };
+    return <WorkoutLogger workout={wk} session={editingSession} onClose={() => setEditingSession(null)} />;
+  }
 
   const workouts = movement.workouts || [];
   const exercises = movement.exercises || [];
@@ -89,7 +94,7 @@ export function MovementSection({ onBack, arg }) {
             const vol = sessionVolume(s);
             const doneCount = (s.entries || []).filter(e => e.done || (e.sets || []).length).length;
             return (
-              <Card key={s.id} style={{ padding: '12px 14px' }}>
+              <Card key={s.id} style={{ padding: '12px 14px' }} onClick={() => setEditingSession(s)}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
@@ -97,7 +102,10 @@ export function MovementSection({ onBack, arg }) {
                       {timeAgo(s.at || s.date)} · {plural(doneCount, 'exercise')}{s.durationMin ? ` · ${s.durationMin} min` : ''}
                     </div>
                   </div>
-                  {vol > 0 && <div style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink, flexShrink: 0, marginLeft: 10 }}>{vol.toLocaleString()} <span style={{ fontSize: 11, color: T.muted }}>lb</span></div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 10 }}>
+                    {vol > 0 && <div style={{ fontFamily: T.fontSerif, fontSize: 14, fontWeight: 600, color: T.ink }}>{vol.toLocaleString()} <span style={{ fontSize: 11, color: T.muted }}>lb</span></div>}
+                    <span style={{ fontFamily: T.fontSans, fontSize: 11, color: ACCENT }}>Edit</span>
+                  </div>
                 </div>
               </Card>
             );

@@ -343,6 +343,9 @@ export function AppStateProvider({ children }) {
     const deleteSession = (id) => setMovement(prev => ({
       ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
     }));
+    const updateSession = (id, patch) => setMovement(prev => ({
+      ...prev, sessions: (prev.sessions || []).map(s => s.id === id ? { ...s, ...patch } : s),
+    }));
 
     // Bodyweight: one entry per day. A falsy/zero value clears that day's entry.
     const logWeight = (value, dayKey = today) => setMovement(prev => {
@@ -503,7 +506,7 @@ export function AppStateProvider({ children }) {
       routines, setRoutineList, setRoutineHistory, toggleRoutineItem,
       movement: mv,
       saveExercise, deleteExercise, saveWorkout, deleteWorkout,
-      scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, logWeight,
+      scheduleWorkout, unscheduleWorkout, logWorkoutSession, deleteSession, updateSession, logWeight,
       skipOccurrence, endRecurrence, removeRecurrence, moveOccurrence, addRecurringWorkout, moveRecurringDay,
       reflection: refl, setDayIntent, setDayEvening,
       calendar: cal, calCache, saveEvent, deleteEvent, saveTask, toggleTask, deleteTask, setCalendarLayer, setCalendarView,
