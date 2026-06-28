@@ -5,19 +5,19 @@ export const ACCENT = T.pillars.movement;
 
 export function Card({ children, style = {}, onClick }) {
   return (
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className={onClick ? 'pressable' : undefined} style={{
       background: T.card, border: `0.5px solid ${T.border}`, borderRadius: 16,
       padding: 16, marginBottom: 10, cursor: onClick ? 'pointer' : 'default', ...style,
     }}>{children}</div>
   );
 }
 
-export function PrimaryBtn({ children, onClick, color = T.ink, style = {} }) {
+export function PrimaryBtn({ children, onClick, color = T.ink, style = {}, disabled = false }) {
   return (
-    <button onClick={e => { e.stopPropagation(); onClick && onClick(e); }} style={{
+    <button disabled={disabled} onClick={e => { e.stopPropagation(); if (!disabled) onClick && onClick(e); }} style={{
       width: '100%', padding: '13px', background: color, color: '#FAF7F2',
       border: 'none', borderRadius: 12, fontFamily: T.fontSans, fontSize: 14, fontWeight: 600,
-      cursor: 'pointer', ...style,
+      cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1, ...style,
     }}>{children}</button>
   );
 }
@@ -64,19 +64,19 @@ export function NumberField({ label, value, onChange, step = 1, unit = '', min =
     <div style={{ flex: 1, minWidth: 0 }}>
       {label && <div style={{ fontFamily: T.fontSans, fontSize: 10, color: T.muted, marginBottom: 4, textAlign: 'center' }}>{label}{unit ? ` (${unit})` : ''}</div>}
       <div style={{ display: 'flex', alignItems: 'center', border: `0.5px solid ${T.border}`, borderRadius: 10, overflow: 'hidden', background: T.card }}>
-        <button onClick={() => bump(-1)} style={stepBtn}>−</button>
+        <button aria-label={`Decrease${label ? ' ' + label.toLowerCase() : ''}`} onClick={() => bump(-1)} style={stepBtn}>−</button>
         <input
           type="number" inputMode="decimal" value={v}
           onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))}
           style={{ width: '100%', minWidth: 0, border: 'none', outline: 'none', textAlign: 'center', background: 'transparent', fontFamily: T.fontSans, fontSize: 15, fontWeight: 600, color: T.ink, padding: '9px 0' }}
         />
-        <button onClick={() => bump(1)} style={stepBtn}>+</button>
+        <button aria-label={`Increase${label ? ' ' + label.toLowerCase() : ''}`} onClick={() => bump(1)} style={stepBtn}>+</button>
       </div>
     </div>
   );
 }
 const stepBtn = {
-  width: 34, flexShrink: 0, alignSelf: 'stretch', border: 'none', background: 'transparent',
+  width: 42, flexShrink: 0, alignSelf: 'stretch', border: 'none', background: 'transparent',
   fontFamily: T.fontSans, fontSize: 18, color: T.muted, cursor: 'pointer', lineHeight: 1,
 };
 
@@ -109,7 +109,7 @@ export function Chip({ children, color = ACCENT, onRemove, onClick, style = {} }
     }}>
       {children}
       {onRemove && (
-        <button onClick={e => { e.stopPropagation(); onRemove(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+        <button aria-label="Remove" onClick={e => { e.stopPropagation(); onRemove(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 14, lineHeight: 1, padding: '4px 6px', margin: '-4px -6px -4px 0' }}>×</button>
       )}
     </span>
   );

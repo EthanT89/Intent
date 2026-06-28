@@ -148,7 +148,7 @@ export function WorkoutLogger({ workout, onClose }) {
                     {k.fields.includes('weight') && <NumberField label="Weight" unit="lb" step={5} value={s.weight} onChange={v => patchSet(i, si, { weight: v })} />}
                     {k.fields.includes('reps') && <NumberField label="Reps" step={1} value={s.reps} onChange={v => patchSet(i, si, { reps: v })} />}
                     {isPR && <span title="New estimated 1-rep-max best" style={{ flexShrink: 0, alignSelf: 'flex-end', marginBottom: 8, fontFamily: T.fontSans, fontSize: 10, fontWeight: 700, color: '#FAF7F2', background: T.amber, padding: '4px 7px', borderRadius: 999, letterSpacing: '0.04em' }}>PR</span>}
-                    <button onClick={() => removeSet(i, si)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0, alignSelf: 'flex-end', marginBottom: 8 }}>×</button>
+                    <button aria-label="Remove set" onClick={() => removeSet(i, si)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 16, lineHeight: 1, padding: '8px 8px', flexShrink: 0, alignSelf: 'flex-end' }}>×</button>
                   </div>
                   );
                 })}
@@ -173,7 +173,7 @@ export function WorkoutLogger({ workout, onClose }) {
       <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="How did it feel? PRs, tweaks…"
         style={{ width: '100%', boxSizing: 'border-box', height: 70, resize: 'none', padding: '11px 13px', border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.card, fontFamily: T.fontSans, fontSize: 14, color: T.ink, outline: 'none', marginBottom: 16, lineHeight: 1.5 }} />
 
-      <PrimaryBtn onClick={save} color={ACCENT} style={{ opacity: anyData ? 1 : 0.5 }}>Save workout</PrimaryBtn>
+      <PrimaryBtn onClick={save} color={ACCENT} disabled={!anyData}>Save workout</PrimaryBtn>
 
       <RestTimer />
     </div>

@@ -123,12 +123,12 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
             {subtitle && <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 2 }}>{subtitle}</div>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={() => shift(-1)} style={chevBtn}>‹</button>
+            <button aria-label="Previous" onClick={() => shift(-1)} style={chevBtn}>‹</button>
             <button onClick={() => setCursor(new Date())} style={{
               padding: '7px 12px', borderRadius: 999, border: `0.5px solid ${T.border}`, background: T.card,
               fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.ink, cursor: 'pointer',
             }}>Today</button>
-            <button onClick={() => shift(1)} style={chevBtn}>›</button>
+            <button aria-label="Next" onClick={() => shift(1)} style={chevBtn}>›</button>
             <button onClick={() => setOptionsOpen(true)} style={{ ...chevBtn, fontSize: 18 }} aria-label="Calendar options">⋯</button>
           </div>
         </div>
@@ -158,7 +158,7 @@ export function CalendarScreen({ intent, onConsumeIntent } = {}) {
       </div>
 
       {/* FAB */}
-      <button onClick={() => setComposer({ mode: 'event', date: dateKey(cursor) })} style={{
+      <button aria-label="Add event or to-do" onClick={() => setComposer({ mode: 'event', date: dateKey(cursor) })} style={{
         position: 'absolute', right: 20, bottom: 'calc(96px + var(--safe-bottom))', zIndex: 50,
         width: 56, height: 56, borderRadius: '50%', border: 'none', cursor: 'pointer',
         background: T.amber, color: '#FAF7F2', fontSize: 30, lineHeight: 1,

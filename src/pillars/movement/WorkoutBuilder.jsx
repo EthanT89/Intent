@@ -88,7 +88,7 @@ export function WorkoutBuilder({ workout, onClose }) {
                   <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex ? ex.name : 'Removed exercise'}</div>
                   <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>{k.label}</div>
                 </div>
-                <button onClick={() => removeItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}>×</button>
+                <button aria-label="Remove exercise" onClick={() => removeItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '6px 8px', margin: '-6px -8px -6px 0', flexShrink: 0 }}>×</button>
               </div>
               {k.fields.length > 0 && (
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -149,7 +149,7 @@ function ExercisePicker({ exercises, onPick, onCreate, onCancel }) {
     <div style={{ background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 14, padding: 14, marginBottom: 18 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <span style={{ fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: T.ink }}>{creating ? 'New exercise' : 'Add exercise'}</span>
-        <button onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1 }}>×</button>
+        <button aria-label="Cancel" onClick={onCancel} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '6px 8px', margin: '-6px -8px' }}>×</button>
       </div>
 
       {!creating && (

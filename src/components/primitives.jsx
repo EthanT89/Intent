@@ -75,6 +75,7 @@ export function PillarPill({ children, onNavigate, cream = false, style = {} }) 
   return (
     <div
       onClick={onNavigate}
+      className={onNavigate ? 'pressable' : undefined}
       style={{
         background: cream ? T.cardCream : T.card,
         border: `0.5px solid ${T.border}`,
