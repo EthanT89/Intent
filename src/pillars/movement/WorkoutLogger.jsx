@@ -1,7 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { kindOf, FIELD_META, epley1RM, bestE1RM } from './model.js';
+import { kindOf, FIELD_META, epley1RM, bestE1RM, exerciseHistory, progressionTarget } from './model.js';
 import { usePointerSort, arrayMove } from './dnd.js';
 import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
@@ -45,6 +45,12 @@ export function WorkoutLogger({ workout, onClose }) {
   // that beats it can light up as a PR while you log.
   const bestByEx = {};
   (workout.items || []).forEach(it => { bestByEx[it.exerciseId] = bestE1RM(sessions, it.exerciseId); });
+
+  // Progressive-overload target per exercise (double progression from history).
+  const targetByEx = {};
+  (workout.items || []).forEach(it => { targetByEx[it.exerciseId] = progressionTarget(it, exerciseHistory(sessions, it.exerciseId)); });
+  const applyTarget = (i, t) => setEntries(prev => prev.map((e, idx) => idx !== i ? e
+    : { ...e, sets: (e.sets || []).map(s => ({ reps: t.reps ?? s.reps, weight: t.weight ?? s.weight })) }));
 
   // Seed entries: prefer what you did last time, falling back to the template.
   const [entries, setEntries] = React.useState(() => (workout.items || []).map(it => {
@@ -139,6 +145,18 @@ export function WorkoutLogger({ workout, onClose }) {
               </div>
               <DragHandle onPointerDown={(ev) => start(i, ev)} />
             </div>
+
+            {k.perSet && targetByEx[e.exerciseId] && (targetByEx[e.exerciseId].weight || targetByEx[e.exerciseId].reps) && (() => {
+              const t = targetByEx[e.exerciseId];
+              const label = `${t.weight ? t.weight + ' × ' : ''}${t.reps ?? ''}`.trim();
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '7px 10px', background: `${ACCENT}12`, border: `0.5px solid ${ACCENT}33`, borderRadius: 9 }}>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.ink }}>🎯 Target {label}</span>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>· {t.reason}</span>
+                  <button onClick={() => applyTarget(i, t)} style={{ marginLeft: 'auto', flexShrink: 0, padding: '4px 10px', border: 'none', borderRadius: 999, background: ACCENT, color: '#FAF7F2', fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Use</button>
+                </div>
+              );
+            })()}
 
             {k.perSet ? (
               <div>

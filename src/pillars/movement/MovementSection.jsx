@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { SectionHeader } from '../../components/primitives.jsx';
-import { scheduledFor, sessionVolume, kindOf, plural, exerciseSummary } from './model.js';
+import { scheduledFor, sessionVolume, kindOf, plural, exerciseSummary, estimateWorkoutMinutes } from './model.js';
 import { Segmented, Card, PrimaryBtn, EmptyHint, ACCENT } from './ui.jsx';
 import { ExerciseEditor } from './ExerciseEditor.jsx';
 import { WorkoutBuilder } from './WorkoutBuilder.jsx';
@@ -38,6 +38,8 @@ export function MovementSection({ onBack, arg }) {
   const exercises = movement.exercises || [];
   const sessions = movement.sessions || [];
   const wkById = Object.fromEntries(workouts.map(w => [w.id, w]));
+  const exByIdM = Object.fromEntries(exercises.map(e => [e.id, e]));
+  const wkMeta = (w) => `${plural((w.items || []).length, 'exercise')} · ~${estimateWorkoutMinutes(w, exByIdM)} min`;
   const todayWorkouts = scheduledFor(movement.schedule || {}, intentNow()).map(id => wkById[id]).filter(Boolean);
 
   return (
@@ -69,7 +71,7 @@ export function MovementSection({ onBack, arg }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
                   <div style={{ fontFamily: T.fontSerif, fontSize: 17, fontWeight: 600, color: T.ink }}>{w.name}</div>
-                  <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</div>
+                  <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{wkMeta(w)}</div>
                 </div>
               </div>
               <PrimaryBtn onClick={() => setLogging(w)} color={ACCENT}>Log this workout</PrimaryBtn>
@@ -117,7 +119,7 @@ export function MovementSection({ onBack, arg }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontFamily: T.fontSerif, fontSize: 16, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
-                      <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</div>
+                      <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{wkMeta(w)}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); setLogging(w); }} style={logBtn}>Log</button>
                   </div>
@@ -178,7 +180,7 @@ export function MovementSection({ onBack, arg }) {
                   background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 12,
                 }}>
                   <span style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{w.name}</span>
-                  <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{plural((w.items || []).length, 'exercise')}</span>
+                  <span style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted }}>{wkMeta(w)}</span>
                 </button>
               ))}
             </div>

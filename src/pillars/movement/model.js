@@ -162,6 +162,42 @@ export function exerciseSummary(sessions, exerciseId) {
   };
 }
 
+// Progressive-overload suggestion for a lift, via double progression: if last
+// time you hit the target reps on every set, bump the weight; otherwise repeat
+// the weight and push for more reps. `item` is the workout's template (target
+// reps/weight); `history` is exerciseHistory() for this lift (newest first).
+// Returns { weight, reps, reason } or null when there's nothing to suggest.
+export function progressionTarget(item, history) {
+  const targetReps = Number(item && item.reps) || null;
+  const last = (history || []).find(h => (h.sets || []).some(s => s.reps || s.weight));
+  if (!last) {
+    const w = Number(item && item.weight) || null;
+    return (w || targetReps) ? { weight: w, reps: targetReps, reason: 'starting target' } : null;
+  }
+  const lastWeight = last.sets.reduce((m, s) => Math.max(m, Number(s.weight) || 0), 0);
+  const hitAll = targetReps && last.sets.length > 0 && last.sets.every(s => (Number(s.reps) || 0) >= targetReps);
+  if (lastWeight > 0 && hitAll) {
+    const inc = lastWeight >= 100 ? 5 : 2.5;
+    return { weight: lastWeight + inc, reps: targetReps, reason: `up ${inc} lb` };
+  }
+  return { weight: lastWeight || (Number(item && item.weight) || null), reps: targetReps, reason: lastWeight ? 'beat last' : 'add reps' };
+}
+
+// Rough working-time estimate (minutes) so a workout can be kept near a time
+// budget. ~3 min per working set (incl. rest); cardio/mobility use their target
+// duration (fallbacks: 20 / 5 min).
+export function estimateWorkoutMinutes(workout, exById = {}) {
+  let min = 0;
+  (workout.items || []).forEach(it => {
+    const ex = exById[it.exerciseId];
+    const k = kindOf(ex && ex.kind);
+    if (k.perSet) min += (Number(it.sets) || 3) * 3;
+    else if ((ex && ex.kind) === 'cardio') min += Number(it.duration) || 20;
+    else min += Number(it.duration) || 5;
+  });
+  return Math.round(min);
+}
+
 // One session's total volume (Σ weight × reps across all sets).
 export function sessionVolume(session) {
   let vol = 0;
