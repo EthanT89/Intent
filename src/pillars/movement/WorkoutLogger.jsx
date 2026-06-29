@@ -57,7 +57,7 @@ export function WorkoutLogger({ workout, onClose }) {
     const ex = exById[it.exerciseId];
     const k = kindOf(ex?.kind);
     const last = lastByEx[it.exerciseId]?.entry;
-    const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', done: false };
+    const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', warmup: !!it.warmup, done: false };
     if (k.perSet) {
       if (last && (last.sets || []).length) {
         base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
@@ -119,8 +119,14 @@ export function WorkoutLogger({ workout, onClose }) {
         const k = kindOf(e.kind);
         const dragging = drag?.from === i;
         const showInsert = drag && drag.over === i && drag.from !== i;
+        const anyWarmup = entries.some(x => x.warmup);
+        const showWarmupHdr = anyWarmup && i === 0 && e.warmup;
+        const showWorkingHdr = anyWarmup && !e.warmup && (i === 0 || entries[i - 1].warmup);
         return (
-          <div key={i} ref={el => (rowRefs.current[i] = el)}>
+          <React.Fragment key={i}>
+          {showWarmupHdr && <SectionHdr>Warm-up</SectionHdr>}
+          {showWorkingHdr && <SectionHdr>Working sets</SectionHdr>}
+          <div ref={el => (rowRefs.current[i] = el)}>
           {showInsert && <div style={{ height: 2, background: ACCENT, borderRadius: 2, margin: '4px 0' }} />}
           <div style={{
             background: T.card, border: `0.5px solid ${e.done ? ACCENT : T.border}`, borderRadius: 14, padding: 14, marginBottom: 10,
@@ -193,6 +199,7 @@ export function WorkoutLogger({ workout, onClose }) {
             />
           </div>
           </div>
+          </React.Fragment>
         );
       })}
 
@@ -206,6 +213,13 @@ export function WorkoutLogger({ workout, onClose }) {
 
       <RestTimer />
     </div>
+  );
+}
+
+// Section divider in the logger (Warm-up / Working sets).
+function SectionHdr({ children }) {
+  return (
+    <div style={{ fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 2px 8px' }}>{children}</div>
   );
 }
 

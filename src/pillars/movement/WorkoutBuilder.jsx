@@ -88,7 +88,11 @@ export function WorkoutBuilder({ workout, onClose }) {
                   <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex ? ex.name : 'Removed exercise'}</div>
                   <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>{k.label}</div>
                 </div>
-                <button aria-label="Remove exercise" onClick={() => removeItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '6px 8px', margin: '-6px -8px -6px 0', flexShrink: 0 }}>×</button>
+                <button onClick={() => patchItem(i, { warmup: !it.warmup })} aria-label="Toggle warm-up" style={{
+                  flexShrink: 0, padding: '4px 9px', borderRadius: 999, cursor: 'pointer', fontFamily: T.fontSans, fontSize: 10.5, fontWeight: 600,
+                  border: `1px solid ${it.warmup ? ACCENT : T.border}`, background: it.warmup ? `${ACCENT}1A` : 'transparent', color: it.warmup ? ACCENT : T.muted,
+                }}>{it.warmup ? 'Warm-up' : 'Working'}</button>
+                <button aria-label="Remove exercise" onClick={() => removeItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.muted, fontSize: 18, lineHeight: 1, padding: '6px 8px', margin: '-6px -4px -6px 0', flexShrink: 0 }}>×</button>
               </div>
               {k.fields.length > 0 && (
                 <div style={{ display: 'flex', gap: 8 }}>
