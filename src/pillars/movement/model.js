@@ -251,3 +251,26 @@ export function weightSummary(movement) {
   const delta = latest && previous ? +(latest.weight - previous.weight).toFixed(1) : null;
   return { entries, latest, previous, delta };
 }
+
+// Smoothed bodyweight trend — what actually matters for a bulk/cut. Returns a
+// 7-day average (the "true" current weight, noise removed) and a weekly rate
+// (least-squares slope over the last `windowDays`, in lb/week). Nulls until
+// there's enough data.
+export function weightTrend(entries, windowDays = 21) {
+  if (!entries || !entries.length) return { avg: null, ratePerWeek: null };
+  const t = (d) => new Date(d + 'T12:00:00').getTime();
+  const lastT = t(entries[entries.length - 1].date);
+  const within = (e, days) => (lastT - t(e.date)) / 86400000 <= days;
+  const win7 = entries.filter(e => within(e, 7));
+  const avg = win7.length ? +(win7.reduce((a, e) => a + e.weight, 0) / win7.length).toFixed(1) : entries[entries.length - 1].weight;
+  const recent = entries.filter(e => within(e, windowDays));
+  if (recent.length < 3) return { avg, ratePerWeek: null };
+  const x0 = t(recent[0].date);
+  const pts = recent.map(e => ({ x: (t(e.date) - x0) / 86400000, y: e.weight }));
+  const n = pts.length;
+  const sx = pts.reduce((a, p) => a + p.x, 0), sy = pts.reduce((a, p) => a + p.y, 0);
+  const sxx = pts.reduce((a, p) => a + p.x * p.x, 0), sxy = pts.reduce((a, p) => a + p.x * p.y, 0);
+  const denom = n * sxx - sx * sx;
+  const slope = denom ? (n * sxy - sx * sy) / denom : 0; // lb/day
+  return { avg, ratePerWeek: +(slope * 7).toFixed(2) };
+}

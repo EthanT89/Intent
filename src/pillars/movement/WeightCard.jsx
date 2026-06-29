@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { Card, NumberField, PrimaryBtn, GhostBtn, ACCENT } from './ui.jsx';
-import { weightSummary } from './model.js';
+import { weightSummary, weightTrend } from './model.js';
 import { intentTodayKey } from '../../lib/dates.js';
 
 // Relative label for a YYYY-MM-DD date key (Today / Yesterday / Nd ago / date).
@@ -55,6 +55,8 @@ export function WeightCard() {
 
   const deltaColor = delta == null || delta === 0 ? T.muted : delta < 0 ? '#5A8A5A' : '#B07A4A';
   const deltaText = delta == null ? null : `${delta > 0 ? '+' : ''}${delta} lb`;
+  const trend = weightTrend(entries);
+  const hasRate = trend.ratePerWeek != null && Math.abs(trend.ratePerWeek) >= 0.05;
 
   return (
     <Card style={{ marginBottom: 16 }}>
@@ -70,12 +72,18 @@ export function WeightCard() {
               </div>
               <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>{whenLabel(latest.date)}</span>
-                {deltaText && (
+                {!hasRate && deltaText && (
                   <span style={{ color: deltaColor, fontWeight: 600 }}>
                     {delta < 0 ? '▼' : delta > 0 ? '▲' : ''} {deltaText.replace('-', '')}
                   </span>
                 )}
               </div>
+              {hasRate && (
+                <div style={{ fontFamily: T.fontSans, fontSize: 12.5, color: T.ink, fontWeight: 600, marginTop: 3 }}>
+                  {trend.ratePerWeek > 0 ? '▲' : '▼'} {Math.abs(trend.ratePerWeek).toFixed(2)} lb/wk
+                  <span style={{ color: T.muted, fontWeight: 500 }}>{trend.avg != null ? ` · 7-day avg ${trend.avg}` : ' trend'}</span>
+                </div>
+              )}
             </>
           ) : (
             <div style={{ fontFamily: T.fontSerif, fontSize: 16, fontWeight: 600, color: T.ink }}>Track your weight</div>
