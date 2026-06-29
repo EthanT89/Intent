@@ -133,6 +133,9 @@ export function WorkoutLogger({ workout, onClose }) {
                 <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>
                   {summarizeLast(lastByEx[e.exerciseId]) || k.label}
                 </div>
+                {exById[e.exerciseId]?.description && (
+                  <div style={{ fontFamily: T.fontSans, fontSize: 11, color: ACCENT, marginTop: 2, lineHeight: 1.35 }}>{exById[e.exerciseId].description}</div>
+                )}
               </div>
               <DragHandle onPointerDown={(ev) => start(i, ev)} />
             </div>
@@ -162,6 +165,14 @@ export function WorkoutLogger({ workout, onClose }) {
                 ))}
               </div>
             )}
+
+            {/* Per-lift note — felt heavy, form cue, machine setting, etc. */}
+            <input
+              value={e.note || ''}
+              onChange={ev => patch(i, { note: ev.target.value })}
+              placeholder={lastByEx[e.exerciseId]?.entry?.note ? `Last: "${lastByEx[e.exerciseId].entry.note}"` : 'Add a note…'}
+              style={{ width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '8px 10px', border: `0.5px solid ${T.border}`, borderRadius: 9, background: T.cardCream, fontFamily: T.fontSans, fontSize: 13, color: T.ink, outline: 'none' }}
+            />
           </div>
           </div>
         );

@@ -123,6 +123,45 @@ export function bestE1RM(sessions, exerciseId, excludeSessionId = null) {
   return best;
 }
 
+// Per-exercise performance log (newest first) — every session you did this
+// exercise, with its sets, note, and computed top weight / est. 1RM. The basis
+// for the "what do I usually do?" history.
+export function exerciseHistory(sessions, exerciseId) {
+  const out = [];
+  for (const s of (sessions || [])) {
+    const e = (s.entries || []).find(en => en.exerciseId === exerciseId);
+    if (!e) continue;
+    const sets = (e.sets || []).filter(st => st.reps || st.weight);
+    if (!sets.length && !e.duration && !e.distance && !e.note) continue;
+    const e1rm = sets.reduce((m, st) => Math.max(m, epley1RM(st.weight, st.reps)), 0);
+    const topWeight = sets.reduce((m, st) => Math.max(m, Number(st.weight) || 0), 0);
+    out.push({ date: s.date || (s.at || '').slice(0, 10), at: s.at, sets, duration: e.duration, distance: e.distance, note: e.note || '', e1rm, topWeight });
+  }
+  return out;
+}
+
+// At-a-glance numbers for an exercise: how often, your typical working weight
+// (the most frequent top-set weight over recent sessions), best est. 1RM, and
+// the most recent per-exercise note.
+export function exerciseSummary(sessions, exerciseId) {
+  const h = exerciseHistory(sessions, exerciseId);
+  if (!h.length) return { count: 0, usualWeight: null, bestE1RM: 0, lastNote: '', lastDate: null };
+  const recent = h.slice(0, 6).map(x => x.topWeight).filter(w => w > 0);
+  let usualWeight = null;
+  if (recent.length) {
+    const freq = {};
+    recent.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+    usualWeight = Number(Object.entries(freq).sort((a, b) => b[1] - a[1] || Number(b[0]) - Number(a[0]))[0][0]);
+  }
+  return {
+    count: h.length,
+    usualWeight,
+    bestE1RM: h.reduce((m, x) => Math.max(m, x.e1rm), 0),
+    lastNote: (h.find(x => x.note) || {}).note || '',
+    lastDate: h[0].date,
+  };
+}
+
 // One session's total volume (Σ weight × reps across all sets).
 export function sessionVolume(session) {
   let vol = 0;

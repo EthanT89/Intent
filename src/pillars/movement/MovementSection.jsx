@@ -2,7 +2,7 @@ import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
 import { SectionHeader } from '../../components/primitives.jsx';
-import { scheduledFor, sessionVolume, kindOf, plural } from './model.js';
+import { scheduledFor, sessionVolume, kindOf, plural, exerciseSummary } from './model.js';
 import { Segmented, Card, PrimaryBtn, EmptyHint, ACCENT } from './ui.jsx';
 import { ExerciseEditor } from './ExerciseEditor.jsx';
 import { WorkoutBuilder } from './WorkoutBuilder.jsx';
@@ -136,14 +136,23 @@ export function MovementSection({ onBack, arg }) {
             <EmptyHint title="No exercises yet" body="Exercises are your building blocks — lifts, stretches, runs, anything. Make them once and reuse them in any workout." cta="+ New exercise" onCta={() => setEditingExercise({})} />
           ) : (
             <>
-              {exercises.map(ex => (
+              {exercises.map(ex => {
+                const sm = exerciseSummary(sessions, ex.id);
+                const sub = sm.count > 0
+                  ? [sm.usualWeight != null && `usually ${sm.usualWeight} lb`, sm.bestE1RM > 0 && `best ~${Math.round(sm.bestE1RM)}`].filter(Boolean).join(' · ')
+                  : null;
+                return (
                 <Card key={ex.id} onClick={() => setEditingExercise(ex)} style={{ padding: '13px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>{ex.name}</div>
-                    <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, background: `${ACCENT}14`, padding: '3px 9px', borderRadius: 999 }}>{kindOf(ex.kind).label}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 600, color: T.ink }}>{ex.name}</div>
+                      {sub && <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginTop: 2 }}>{sub}</div>}
+                    </div>
+                    <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted, background: `${ACCENT}14`, padding: '3px 9px', borderRadius: 999, flexShrink: 0 }}>{kindOf(ex.kind).label}</div>
                   </div>
                 </Card>
-              ))}
+                );
+              })}
               <button onClick={() => setEditingExercise({})} style={ghostFull}>+ New exercise</button>
             </>
           )}
