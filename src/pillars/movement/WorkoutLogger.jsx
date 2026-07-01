@@ -1,7 +1,7 @@
 import React from 'react';
 import { T } from '../../theme/tokens.js';
 import { useApp } from '../../store/AppStateContext.jsx';
-import { kindOf, FIELD_META, epley1RM, bestE1RM, exerciseHistory, progressionTarget } from './model.js';
+import { kindOf, FIELD_META, epley1RM, bestE1RM, exerciseHistory, progressionTarget, uid } from './model.js';
 import { usePointerSort, arrayMove } from './dnd.js';
 import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
 import { timeAgo } from '../../lib/dates.js';
@@ -33,47 +33,55 @@ function summarizeLast(last) {
 // targets; you record what you actually did (weight × reps per set, or
 // time/distance), check off exercises, add overall duration + notes.
 export function WorkoutLogger({ workout, onClose }) {
-  const { movement, logWorkoutSession } = useApp();
+  const { movement, logWorkoutSession, saveExercise } = useApp();
   const exById = Object.fromEntries((movement.exercises || []).map(e => [e.id, e]));
   const sessions = movement.sessions || [];
 
-  // "Last time" per exercise — shown as a hint and used to prefill.
-  const lastByEx = {};
-  (workout.items || []).forEach(it => { lastByEx[it.exerciseId] = lastEntryFor(sessions, it.exerciseId); });
+  // Build a fresh entry for a workout item (or a swapped-in exercise): prefer
+  // what you did last time for THAT exercise, else the template.
+  const seedEntry = (it) => {
+    const ex = exById[it.exerciseId];
+    const k = kindOf(ex?.kind);
+    const last = lastEntryFor(sessions, it.exerciseId)?.entry;
+    const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', warmup: !!it.warmup, targetReps: it.reps != null ? Number(it.reps) : null, done: false };
+    if (k.perSet) {
+      if (last && (last.sets || []).length) base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
+      else { const n = Math.max(1, Number(it.sets) || 1); base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' })); }
+    } else { base.duration = (last && last.duration) ?? it.duration ?? ''; base.distance = (last && last.distance) ?? it.distance ?? ''; base.sets = []; }
+    return base;
+  };
 
-  // All-time best estimated 1RM per exercise (from past sessions only), so a set
-  // that beats it can light up as a PR while you log.
-  const bestByEx = {};
-  (workout.items || []).forEach(it => { bestByEx[it.exerciseId] = bestE1RM(sessions, it.exerciseId); });
+  // Autosave draft — never lose mid-workout progress (survives an app close/crash).
+  const DRAFT_KEY = 'intent.workoutDraft';
+  const draft0 = React.useRef((() => {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); if (d && d.workoutId === workout.id && Date.now() - (d.savedAt || 0) < 8 * 3600 * 1000) return d; } catch { /* ignore */ }
+    return null;
+  })()).current;
 
-  // Progressive-overload target per exercise (double progression from history).
-  const targetByEx = {};
-  (workout.items || []).forEach(it => { targetByEx[it.exerciseId] = progressionTarget(it, exerciseHistory(sessions, it.exerciseId)); });
+  const [entries, setEntries] = React.useState(() => (draft0 && draft0.entries) || (workout.items || []).map(seedEntry));
+  const [durationMin, setDurationMin] = React.useState(draft0 ? (draft0.durationMin ?? '') : '');
+  const [notes, setNotes] = React.useState(draft0 ? (draft0.notes ?? '') : '');
+  const [resumed, setResumed] = React.useState(!!draft0);
+  const [swapFor, setSwapFor] = React.useState(null); // entry index being swapped
+
   const applyTarget = (i, t) => setEntries(prev => prev.map((e, idx) => idx !== i ? e
     : { ...e, sets: (e.sets || []).map(s => ({ reps: t.reps ?? s.reps, weight: t.weight ?? s.weight })) }));
 
-  // Seed entries: prefer what you did last time, falling back to the template.
-  const [entries, setEntries] = React.useState(() => (workout.items || []).map(it => {
-    const ex = exById[it.exerciseId];
-    const k = kindOf(ex?.kind);
-    const last = lastByEx[it.exerciseId]?.entry;
-    const base = { exerciseId: it.exerciseId, name: ex?.name || 'Exercise', kind: ex?.kind || 'strength', warmup: !!it.warmup, done: false };
-    if (k.perSet) {
-      if (last && (last.sets || []).length) {
-        base.sets = last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }));
-      } else {
-        const n = Math.max(1, Number(it.sets) || 1);
-        base.sets = Array.from({ length: n }, () => ({ reps: it.reps ?? '', weight: it.weight ?? '' }));
-      }
-    } else {
-      base.duration = (last && last.duration) ?? it.duration ?? '';
-      base.distance = (last && last.distance) ?? it.distance ?? '';
-      base.sets = [];
-    }
-    return base;
-  }));
-  const [durationMin, setDurationMin] = React.useState('');
-  const [notes, setNotes] = React.useState('');
+  // Swap this exercise for another (machine taken, injury, preference) — re-seeds
+  // from the new exercise's own history so its data stays clean.
+  const swapExercise = (i, ex) => {
+    setEntries(prev => prev.map((e, idx) => {
+      if (idx !== i) return e;
+      const k = kindOf(ex.kind);
+      const last = lastEntryFor(sessions, ex.id)?.entry;
+      const base = { exerciseId: ex.id, name: ex.name, kind: ex.kind, warmup: e.warmup, targetReps: e.targetReps, done: false, note: '' };
+      if (k.perSet) base.sets = (last && (last.sets || []).length) ? last.sets.map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' }))
+        : ((e.sets || []).length ? e.sets.map(() => ({ reps: e.targetReps ?? '', weight: '' })) : [{ reps: '', weight: '' }]);
+      else { base.duration = last?.duration ?? ''; base.distance = last?.distance ?? ''; base.sets = []; }
+      return base;
+    }));
+    setSwapFor(null);
+  };
 
   // Drag to reorder exercises mid-workout (same primitive as the builder).
   const rowRefs = React.useRef([]);
@@ -92,7 +100,16 @@ export function WorkoutLogger({ workout, onClose }) {
   }));
   const removeSet = (i, si) => setEntries(prev => prev.map((e, idx) => idx === i ? { ...e, sets: e.sets.filter((_, sj) => sj !== si) } : e));
 
-  const anyData = entries.some(e => e.done || (e.sets || []).some(s => s.reps || s.weight) || e.duration || e.distance);
+  const anyData = entries.some(e => e.done || (e.sets || []).some(s => s.reps || s.weight) || e.duration || e.distance || e.note);
+
+  // Autosave to a local draft on every change, so progress is never lost if the
+  // app closes mid-workout. Cleared when the session is saved for real.
+  React.useEffect(() => {
+    const has = anyData || !!notes || durationMin !== '';
+    try {
+      if (has) localStorage.setItem(DRAFT_KEY, JSON.stringify({ workoutId: workout.id, name: workout.name, savedAt: Date.now(), entries, durationMin, notes }));
+    } catch { /* storage full / unavailable — ignore */ }
+  }, [entries, durationMin, notes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = () => {
     logWorkoutSession({
@@ -102,12 +119,21 @@ export function WorkoutLogger({ workout, onClose }) {
       notes: notes.trim(),
       entries,
     });
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     onClose();
   };
 
   return (
     <div style={{ padding: '10px 16px calc(150px + var(--safe-bottom))' }}>
       <BackBar label="Movement" onBack={onClose} title={`Log: ${workout.name || 'Workout'}`} />
+
+      {resumed && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, padding: '9px 12px', background: `${ACCENT}12`, border: `0.5px solid ${ACCENT}33`, borderRadius: 10 }}>
+          <span style={{ fontFamily: T.fontSans, fontSize: 12.5, color: T.ink, flex: 1 }}>Resumed your progress from earlier.</span>
+          <button onClick={() => { setEntries((workout.items || []).map(seedEntry)); setDurationMin(''); setNotes(''); setResumed(false); }}
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 12, fontWeight: 600, color: T.muted }}>Start fresh</button>
+        </div>
+      )}
 
       {entries.length === 0 && (
         <div style={{ fontFamily: T.fontSans, fontSize: 13, color: T.muted, padding: '14px 0', textAlign: 'center' }}>
@@ -122,6 +148,10 @@ export function WorkoutLogger({ workout, onClose }) {
         const anyWarmup = entries.some(x => x.warmup);
         const showWarmupHdr = anyWarmup && i === 0 && e.warmup;
         const showWorkingHdr = anyWarmup && !e.warmup && (i === 0 || entries[i - 1].warmup);
+        // Per-entry so swaps (different exerciseId) get the right history/target.
+        const last = lastEntryFor(sessions, e.exerciseId);
+        const best = bestE1RM(sessions, e.exerciseId);
+        const target = e.warmup ? null : progressionTarget({ reps: e.targetReps }, exerciseHistory(sessions, e.exerciseId));
         return (
           <React.Fragment key={i}>
           {showWarmupHdr && <SectionHdr>Warm-up</SectionHdr>}
@@ -143,17 +173,21 @@ export function WorkoutLogger({ workout, onClose }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: T.fontSerif, fontSize: 15, fontWeight: 600, color: T.ink }}>{e.name}</div>
                 <div style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>
-                  {summarizeLast(lastByEx[e.exerciseId]) || k.label}
+                  {summarizeLast(last) || k.label}
                 </div>
                 {exById[e.exerciseId]?.description && (
                   <div style={{ fontFamily: T.fontSans, fontSize: 11, color: ACCENT, marginTop: 2, lineHeight: 1.35 }}>{exById[e.exerciseId].description}</div>
                 )}
               </div>
+              <button onClick={() => setSwapFor(i)} aria-label="Swap exercise" style={{
+                flexShrink: 0, background: 'none', border: `0.5px solid ${T.border}`, borderRadius: 999, cursor: 'pointer',
+                color: T.muted, fontFamily: T.fontSans, fontSize: 11, fontWeight: 600, padding: '5px 10px',
+              }}>⇄ Swap</button>
               <DragHandle onPointerDown={(ev) => start(i, ev)} />
             </div>
 
-            {k.perSet && targetByEx[e.exerciseId] && (targetByEx[e.exerciseId].weight || targetByEx[e.exerciseId].reps) && (() => {
-              const t = targetByEx[e.exerciseId];
+            {k.perSet && target && (target.weight || target.reps) && (() => {
+              const t = target;
               const label = `${t.weight ? t.weight + ' × ' : ''}${t.reps ?? ''}`.trim();
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '7px 10px', background: `${ACCENT}12`, border: `0.5px solid ${ACCENT}33`, borderRadius: 9 }}>
@@ -167,8 +201,8 @@ export function WorkoutLogger({ workout, onClose }) {
             {k.perSet ? (
               <div>
                 {e.sets.map((s, si) => {
-                  const isPR = k.fields.includes('weight') && bestByEx[e.exerciseId] > 0
-                    && epley1RM(s.weight, s.reps) > bestByEx[e.exerciseId] + 0.01;
+                  const isPR = k.fields.includes('weight') && best > 0
+                    && epley1RM(s.weight, s.reps) > best + 0.01;
                   return (
                   <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ width: 22, flexShrink: 0, fontFamily: T.fontSans, fontSize: 12, color: T.muted, fontWeight: 600 }}>{si + 1}</span>
@@ -194,7 +228,7 @@ export function WorkoutLogger({ workout, onClose }) {
             <input
               value={e.note || ''}
               onChange={ev => patch(i, { note: ev.target.value })}
-              placeholder={lastByEx[e.exerciseId]?.entry?.note ? `Last: "${lastByEx[e.exerciseId].entry.note}"` : 'Add a note…'}
+              placeholder={last?.entry?.note ? `Last: "${last.entry.note}"` : 'Add a note…'}
               style={{ width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '8px 10px', border: `0.5px solid ${T.border}`, borderRadius: 9, background: T.cardCream, fontFamily: T.fontSans, fontSize: 13, color: T.ink, outline: 'none' }}
             />
           </div>
@@ -212,6 +246,56 @@ export function WorkoutLogger({ workout, onClose }) {
       <PrimaryBtn onClick={save} color={ACCENT} disabled={!anyData}>Save workout</PrimaryBtn>
 
       <RestTimer />
+
+      {swapFor != null && (
+        <SwapSheet
+          exercises={movement.exercises || []}
+          current={exById[entries[swapFor]?.exerciseId]}
+          onClose={() => setSwapFor(null)}
+          onPick={(ex) => swapExercise(swapFor, ex)}
+          onCreate={(ex) => { const created = { id: uid('ex'), description: '', ...ex }; saveExercise(created); swapExercise(swapFor, created); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Swap the current exercise for another (or a new one) — machine taken, injury,
+// preference. Same-kind exercises float to the top; search to filter.
+function SwapSheet({ exercises, current, onClose, onPick, onCreate }) {
+  const [q, setQ] = React.useState('');
+  const kind = current?.kind || 'strength';
+  const list = exercises
+    .filter(e => e.id !== current?.id && e.name.toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => (a.kind === kind ? -1 : 1) - (b.kind === kind ? -1 : 1) || a.name.localeCompare(b.name));
+  return (
+    <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 300, background: 'rgba(44,36,24,0.3)', display: 'flex', alignItems: 'flex-end' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: T.card, borderRadius: '20px 20px 0 0', padding: '16px 20px calc(28px + var(--safe-bottom))', maxHeight: '82%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}><div style={{ width: 36, height: 4, borderRadius: 999, background: T.border }} /></div>
+        <div style={{ fontFamily: T.fontSerif, fontSize: 18, fontWeight: 600, color: T.ink, marginBottom: 2 }}>Swap {current?.name || 'exercise'}</div>
+        <div style={{ fontFamily: T.fontSans, fontSize: 12, color: T.muted, marginBottom: 12 }}>Just for this session — history stays with each exercise.</div>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search exercises…" autoFocus
+          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: `0.5px solid ${T.border}`, borderRadius: 10, background: T.cardCream, fontFamily: T.fontSans, fontSize: 15, color: T.ink, outline: 'none', marginBottom: 10 }} />
+        <div className="intent-scroll" style={{ overflowY: 'auto', flex: 1 }}>
+          {list.map(ex => (
+            <button key={ex.id} onClick={() => onPick(ex)} style={{
+              display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
+              padding: '11px 13px', marginBottom: 6, cursor: 'pointer', textAlign: 'left',
+              background: T.cardCream, border: `0.5px solid ${T.border}`, borderRadius: 10,
+            }}>
+              <span style={{ fontFamily: T.fontSans, fontSize: 14, fontWeight: 500, color: T.ink }}>{ex.name}</span>
+              <span style={{ fontFamily: T.fontSans, fontSize: 11, color: T.muted }}>{kindOf(ex.kind).label}</span>
+            </button>
+          ))}
+          {q.trim() && !list.some(e => e.name.toLowerCase() === q.trim().toLowerCase()) && (
+            <button onClick={() => onCreate({ name: q.trim(), kind })} style={{
+              width: '100%', padding: '11px', marginTop: 2, cursor: 'pointer', textAlign: 'left',
+              background: 'transparent', border: `1px dashed ${ACCENT}`, borderRadius: 10,
+              fontFamily: T.fontSans, fontSize: 13, fontWeight: 600, color: ACCENT,
+            }}>+ Create "{q.trim()}" ({kindOf(kind).label})</button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
