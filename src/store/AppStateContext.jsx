@@ -336,10 +336,23 @@ export function AppStateProvider({ children }) {
       return { ...prev, schedule: sched };
     });
 
-    const logWorkoutSession = (session) => setMovement(prev => ({
-      ...prev,
-      sessions: [{ id: uid('ses'), date: today, at: new Date().toISOString(), ...session }, ...(prev.sessions || [])],
-    }));
+    // Save a workout session. Upserts by (workoutId, intent-day) OR by an explicit
+    // session id — so saving the same workout again today (to lock in progress,
+    // reopen and continue, etc.) UPDATES that one session instead of piling up
+    // duplicates. A fresh workout with no same-day match creates a new session.
+    const logWorkoutSession = (session) => setMovement(prev => {
+      const sessions = prev.sessions || [];
+      const at = new Date().toISOString();
+      let idx = -1;
+      if (session.id) idx = sessions.findIndex(s => s.id === session.id);
+      if (idx < 0 && session.workoutId) idx = sessions.findIndex(s => s.workoutId === session.workoutId && s.date === today);
+      if (idx >= 0) {
+        const copy = sessions.slice();
+        copy[idx] = { ...copy[idx], ...session, id: copy[idx].id, date: copy[idx].date || today, at };
+        return { ...prev, sessions: copy };
+      }
+      return { ...prev, sessions: [{ id: uid('ses'), date: today, at, ...session }, ...sessions] };
+    });
     const deleteSession = (id) => setMovement(prev => ({
       ...prev, sessions: (prev.sessions || []).filter(s => s.id !== id),
     }));

@@ -4,7 +4,7 @@ import { useApp } from '../../store/AppStateContext.jsx';
 import { kindOf, FIELD_META, epley1RM, bestE1RM, exerciseHistory, progressionTarget, uid } from './model.js';
 import { usePointerSort, arrayMove } from './dnd.js';
 import { BackBar, PrimaryBtn, NumberField, DragHandle, ACCENT } from './ui.jsx';
-import { timeAgo } from '../../lib/dates.js';
+import { timeAgo, intentTodayKey } from '../../lib/dates.js';
 import { haptics } from '../../lib/haptics.js';
 
 // Most recent prior session entry for an exercise (for "last time" + prefill).
@@ -58,10 +58,19 @@ export function WorkoutLogger({ workout, onClose }) {
     return null;
   })()).current;
 
-  const [entries, setEntries] = React.useState(() => (draft0 && draft0.entries) || (workout.items || []).map(seedEntry));
-  const [durationMin, setDurationMin] = React.useState(draft0 ? (draft0.durationMin ?? '') : '');
-  const [notes, setNotes] = React.useState(draft0 ? (draft0.notes ?? '') : '');
-  const [resumed, setResumed] = React.useState(!!draft0);
+  // Resume priority: an autosaved draft (crash recovery) → today's already-saved
+  // session for this workout (so re-saving updates it, never duplicates) → template.
+  const todaySession = workout.id ? sessions.find(s => s.workoutId === workout.id && s.date === intentTodayKey()) : null;
+  const restore = draft0 || (todaySession ? {
+    entries: (todaySession.entries || []).map(e => ({ ...e, sets: (e.sets || []).map(s => ({ reps: s.reps ?? '', weight: s.weight ?? '' })) })),
+    durationMin: todaySession.durationMin ?? '',
+    notes: todaySession.notes ?? '',
+  } : null);
+
+  const [entries, setEntries] = React.useState(() => (restore && restore.entries) || (workout.items || []).map(seedEntry));
+  const [durationMin, setDurationMin] = React.useState(restore ? (restore.durationMin ?? '') : '');
+  const [notes, setNotes] = React.useState(restore ? (restore.notes ?? '') : '');
+  const [resumed, setResumed] = React.useState(!!restore);
   const [swapFor, setSwapFor] = React.useState(null); // entry index being swapped
 
   const applyTarget = (i, t) => setEntries(prev => prev.map((e, idx) => idx !== i ? e
